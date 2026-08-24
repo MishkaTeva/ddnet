@@ -388,6 +388,7 @@ public:
 	static void ConUnmuteSparkFx(IConsole::IResult *pResult, void *pUserData);
 	static void ConSpawnPortal(IConsole::IResult *pResult, void *pUserData);
 	static void ConClearPortals(IConsole::IResult *pResult, void *pUserData);
+	static void ConSpawnClock(IConsole::IResult *pResult, void *pUserData);
 #endif
 	void RegisterDDRaceCommands();
 	void RegisterChatCommands();

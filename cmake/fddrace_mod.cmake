@@ -45,6 +45,8 @@ set(FDDRACE_MOD_GAME_SRC
   src/mod/game/server/entities/unmute_spark.h
   src/mod/game/server/entities/portal.cpp
   src/mod/game/server/entities/portal.h
+  src/mod/game/server/entities/clock.cpp
+  src/mod/game/server/entities/clock.h
 )
 
 set(FDDRACE_MOD_SRC

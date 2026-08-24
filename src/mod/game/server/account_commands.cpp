@@ -7,6 +7,7 @@
 #include <game/server/player.h>
 
 #include <mod/game/server/entities/atom.h>
+#include <mod/game/server/entities/clock.h>
 #include <mod/game/server/entities/epic_circle.h>
 #include <mod/game/server/entities/kick_boot.h>
 #include <mod/game/server/entities/lovely.h>
@@ -306,6 +307,20 @@ void CGameContext::ConClearPortals(IConsole::IResult *pResult, void *pUserData)
 	pSelf->Console()->Print(IConsole::OUTPUT_LEVEL_STANDARD, "portal", "Portals cleared");
 }
 
+void CGameContext::ConSpawnClock(IConsole::IResult *pResult, void *pUserData)
+{
+	CGameContext *pSelf = (CGameContext *)pUserData;
+	const int ClientId = pResult->GetVictim();
+	CCharacter *pChr = pSelf->GetPlayerChar(ClientId);
+	if(!pChr)
+		return;
+	vec2 Pos = pChr->GetPos() + vec2(0.f, -80.f);
+	if(pResult->NumArguments() >= 3)
+		Pos = vec2((float)pResult->GetInteger(1), (float)pResult->GetInteger(2));
+	new CClock(&pSelf->m_World, Pos);
+	pSelf->Console()->Print(IConsole::OUTPUT_LEVEL_STANDARD, "clock", "Clock spawned");
+}
+
 void CGameContext::RegisterFddraceAccountCommands()
 {
 	Console()->Register("register", "s[name] s[password] s[password]", CFGFLAG_CHAT | CFGFLAG_SERVER, ConRegister, this, "Register an account");
@@ -330,6 +345,7 @@ void CGameContext::RegisterFddraceAccountCommands()
 	Console()->Register("unmute_spark_fx", "v[id]", CFGFLAG_SERVER, ConUnmuteSparkFx, this, "Spawn unmute spark VFX");
 	Console()->Register("spawn_portal", "v[id] ?i[x] ?i[y]", CFGFLAG_SERVER, ConSpawnPortal, this, "Place/link portal for player (optional x y)");
 	Console()->Register("clear_portals", "v[id]", CFGFLAG_SERVER, ConClearPortals, this, "Clear player portals");
+	Console()->Register("spawn_clock", "v[id] ?i[x] ?i[y]", CFGFLAG_SERVER, ConSpawnClock, this, "Spawn analog clock above player");
 }
 
 #endif
