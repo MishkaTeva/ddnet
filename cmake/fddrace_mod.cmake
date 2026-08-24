@@ -59,6 +59,10 @@ set(FDDRACE_MOD_GAME_SRC
   src/mod/game/server/entities/custom_projectile.h
   src/mod/game/server/entities/teleporter.cpp
   src/mod/game/server/entities/teleporter.h
+  src/mod/game/server/entities/meteor.cpp
+  src/mod/game/server/entities/meteor.h
+  src/mod/game/server/entities/playercounter.cpp
+  src/mod/game/server/entities/playercounter.h
 )
 
 set(FDDRACE_MOD_SRC

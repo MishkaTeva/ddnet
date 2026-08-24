@@ -16,8 +16,10 @@
 #include <mod/game/server/entities/kick_boot.h>
 #include <mod/game/server/entities/lightsaber.h>
 #include <mod/game/server/entities/lovely.h>
+#include <mod/game/server/entities/meteor.h>
 #include <mod/game/server/entities/mute_gag.h>
 #include <mod/game/server/entities/pickup_drop.h>
+#include <mod/game/server/entities/playercounter.h>
 #include <mod/game/server/entities/portal.h>
 #include <mod/game/server/entities/rotating_ball.h>
 #include <mod/game/server/entities/staff_ind.h>
@@ -505,6 +507,57 @@ void CGameContext::ConSpawnTeleporter(IConsole::IResult *pResult, void *pUserDat
 	pSelf->Console()->Print(IConsole::OUTPUT_LEVEL_STANDARD, "teleporter", "Spawned");
 }
 
+void CGameContext::ConSpawnMeteor(IConsole::IResult *pResult, void *pUserData)
+{
+	CGameContext *pSelf = (CGameContext *)pUserData;
+	const int ClientId = pResult->GetVictim();
+	CCharacter *pChr = pSelf->GetPlayerChar(ClientId);
+	if(!pChr || !pSelf->m_apPlayers[ClientId])
+		return;
+	const bool Infinite = pResult->NumArguments() > 1 && pResult->GetInteger(1) != 0;
+	if(Infinite)
+		pSelf->m_apPlayers[ClientId]->m_InfMeteors++;
+	else
+		pChr->m_Meteors++;
+	new CMeteor(&pSelf->m_World, pChr->GetPos(), ClientId, Infinite);
+	pSelf->Console()->Print(IConsole::OUTPUT_LEVEL_STANDARD, "meteor", "Spawned");
+}
+
+void CGameContext::ConClearMeteors(IConsole::IResult *pResult, void *pUserData)
+{
+	CGameContext *pSelf = (CGameContext *)pUserData;
+	const int ClientId = pResult->GetVictim();
+	CCharacter *pChr = pSelf->GetPlayerChar(ClientId);
+	if(pSelf->m_apPlayers[ClientId])
+		pSelf->m_apPlayers[ClientId]->m_InfMeteors = 0;
+	if(pChr)
+		pChr->m_Meteors = 0;
+	pSelf->Console()->Print(IConsole::OUTPUT_LEVEL_STANDARD, "meteor", "Cleared counters (entities despawn next tick)");
+}
+
+void CGameContext::ConSpawnPlayerCounter(IConsole::IResult *pResult, void *pUserData)
+{
+	CGameContext *pSelf = (CGameContext *)pUserData;
+	const int ClientId = pResult->GetVictim();
+	CCharacter *pChr = pSelf->GetPlayerChar(ClientId);
+	if(!pChr)
+		return;
+	const int Port = pResult->NumArguments() > 1 ? pResult->GetInteger(1) : 8303;
+	new CPlayerCounter(&pSelf->m_World, pChr->GetPos(), Port);
+	pSelf->Console()->Print(IConsole::OUTPUT_LEVEL_STANDARD, "playercounter", "Spawned");
+}
+
+void CGameContext::ConUpdatePlayerCounter(IConsole::IResult *pResult, void *pUserData)
+{
+	CGameContext *pSelf = (CGameContext *)pUserData;
+	if(pResult->NumArguments() < 2)
+		return;
+	const int Port = pResult->GetInteger(0);
+	const int Count = pResult->GetInteger(1);
+	for(CPlayerCounter *pEnt = (CPlayerCounter *)pSelf->m_World.FindFirst(CGameWorld::ENTTYPE_PLAYER_COUNTER); pEnt; pEnt = (CPlayerCounter *)pEnt->TypeNext())
+		pEnt->OnUpdate(Port, Count);
+}
+
 void CGameContext::RegisterFddraceAccountCommands()
 {
 	Console()->Register("register", "s[name] s[password] s[password]", CFGFLAG_CHAT | CFGFLAG_SERVER, ConRegister, this, "Register an account");
@@ -536,6 +589,10 @@ void CGameContext::RegisterFddraceAccountCommands()
 	Console()->Register("drop_pickup", "v[id] ?s[kind] ?i[weapon]", CFGFLAG_SERVER, ConDropPickup, this, "Drop health/armor/weapon pickup (kind: health|armor|gun|shotgun|grenade|laser|ninja)");
 	Console()->Register("spawn_custom_projectile", "v[id] ?s[spooky|plasma|heart]", CFGFLAG_SERVER, ConSpawnCustomProjectile, this, "Fire custom projectile from player");
 	Console()->Register("spawn_teleporter", "v[id] ?s[out|in|weapon|hook] ?i[number]", CFGFLAG_SERVER, ConSpawnTeleporter, this, "Place runtime map teleporter at player tile");
+	Console()->Register("spawn_meteor", "v[id] ?i[infinite]", CFGFLAG_SERVER, ConSpawnMeteor, this, "Spawn meteor following player (1=infinite)");
+	Console()->Register("clear_meteors", "v[id]", CFGFLAG_SERVER, ConClearMeteors, this, "Clear meteor counters for player");
+	Console()->Register("spawn_playercounter", "v[id] ?i[port]", CFGFLAG_SERVER, ConSpawnPlayerCounter, this, "Spawn laser player-count display");
+	Console()->Register("update_playercounter", "i[port] i[count]", CFGFLAG_SERVER, ConUpdatePlayerCounter, this, "Update player counters for a port");
 }
 
 #endif

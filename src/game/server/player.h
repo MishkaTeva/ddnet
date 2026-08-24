@@ -279,6 +279,7 @@ public:
 	bool m_KickBoot = false;
 	bool m_UnmuteSpark = false;
 	bool m_BanPlungerToilet = false;
+	int m_InfMeteors = 0;
 	class CPortal *m_apPortal[2] = {};
 	int GetAccID() const;
 #endif

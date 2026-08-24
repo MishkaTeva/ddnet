@@ -395,6 +395,10 @@ public:
 	static void ConDropPickup(IConsole::IResult *pResult, void *pUserData);
 	static void ConSpawnCustomProjectile(IConsole::IResult *pResult, void *pUserData);
 	static void ConSpawnTeleporter(IConsole::IResult *pResult, void *pUserData);
+	static void ConSpawnMeteor(IConsole::IResult *pResult, void *pUserData);
+	static void ConClearMeteors(IConsole::IResult *pResult, void *pUserData);
+	static void ConSpawnPlayerCounter(IConsole::IResult *pResult, void *pUserData);
+	static void ConUpdatePlayerCounter(IConsole::IResult *pResult, void *pUserData);
 #endif
 	void RegisterDDRaceCommands();
 	void RegisterChatCommands();
