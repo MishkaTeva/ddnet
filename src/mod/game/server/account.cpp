@@ -10,6 +10,9 @@
 #include <game/server/gamecontext.h>
 #include <game/server/player.h>
 
+#include <mod/game/server/entities/jail_arrest.h>
+#include <mod/game/server/entities/jail_release.h>
+
 #include <cstdio>
 #include <fstream>
 #include <string>
@@ -345,9 +348,22 @@ void CAccountSystem::JailPlayer(int ClientId, int Seconds)
 		return;
 	if(Seconds < 0)
 		Seconds = 0;
+	if(pPlayer->m_JailArresting || pPlayer->m_JailReleasing)
+		return;
 
 	pPlayer->m_JailTime = (int64_t)m_pGameServer->Server()->TickSpeed() * Seconds;
-	pPlayer->KillCharacter(WEAPON_GAME);
+
+	CCharacter *pChr = pPlayer->GetCharacter();
+	if(pChr)
+	{
+		vec2 HolePos = pChr->GetPos();
+		if(!CJailArrest::FindHolePos(m_pGameServer, pChr->GetPos(), &HolePos))
+			HolePos = pChr->GetPos() + vec2(0.f, -128.f);
+		new CJailArrest(&m_pGameServer->m_World, HolePos, ClientId);
+	}
+	else
+		pPlayer->KillCharacter(WEAPON_GAME);
+
 	char aBuf[128];
 	str_format(aBuf, sizeof(aBuf), "'%s' arrested for %d seconds", m_pGameServer->Server()->ClientName(ClientId), Seconds);
 	m_pGameServer->SendChat(-1, TEAM_ALL, aBuf);
@@ -360,12 +376,24 @@ void CAccountSystem::ReleaseJail(int ClientId)
 	CPlayer *pPlayer = m_pGameServer->m_apPlayers[ClientId];
 	if(!pPlayer || pPlayer->m_JailTime <= 0)
 		return;
+	if(pPlayer->m_JailArresting || pPlayer->m_JailReleasing)
+		return;
 
-	pPlayer->m_JailTime = 0;
-	pPlayer->KillCharacter(WEAPON_GAME);
-	char aBuf[128];
-	str_format(aBuf, sizeof(aBuf), "'%s' released from jail", m_pGameServer->Server()->ClientName(ClientId));
-	m_pGameServer->SendChat(-1, TEAM_ALL, aBuf);
+	CCharacter *pChr = pPlayer->GetCharacter();
+	if(pChr)
+	{
+		vec2 PortalPos = pChr->GetPos();
+		CJailRelease::FindPortalPos(m_pGameServer, pChr->GetPos(), &PortalPos);
+		new CJailRelease(&m_pGameServer->m_World, PortalPos, ClientId);
+	}
+	else
+	{
+		pPlayer->m_JailTime = 0;
+		pPlayer->KillCharacter(WEAPON_GAME);
+		char aBuf[128];
+		str_format(aBuf, sizeof(aBuf), "'%s' released from jail", m_pGameServer->Server()->ClientName(ClientId));
+		m_pGameServer->SendChat(-1, TEAM_ALL, aBuf);
+	}
 }
 
 bool CAccountSystem::IsJailed(int ClientId) const

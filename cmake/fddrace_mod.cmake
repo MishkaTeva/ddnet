@@ -15,6 +15,14 @@ set(FDDRACE_MOD_GAME_SRC
   src/mod/game/server/account_commands.cpp
   src/mod/game/server/versioncheck.cpp
   src/mod/game/server/versioncheck.h
+  src/mod/game/server/entities/lasertext.cpp
+  src/mod/game/server/entities/lasertext.h
+  src/mod/game/server/entities/money.cpp
+  src/mod/game/server/entities/money.h
+  src/mod/game/server/entities/jail_arrest.cpp
+  src/mod/game/server/entities/jail_arrest.h
+  src/mod/game/server/entities/jail_release.cpp
+  src/mod/game/server/entities/jail_release.h
 )
 
 set(FDDRACE_MOD_SRC

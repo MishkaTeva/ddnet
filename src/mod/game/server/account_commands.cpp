@@ -99,6 +99,27 @@ void CGameContext::ConJailRelease(IConsole::IResult *pResult, void *pUserData)
 	pSelf->Accounts()->ReleaseJail(pResult->GetVictim());
 }
 
+void CGameContext::ConLaserText(IConsole::IResult *pResult, void *pUserData)
+{
+	CGameContext *pSelf = (CGameContext *)pUserData;
+	const int ClientId = pResult->GetVictim();
+	CPlayer *pPlayer = pSelf->m_apPlayers[ClientId];
+	if(!pPlayer || !pPlayer->GetCharacter())
+		return;
+	pSelf->CreateLaserText(pPlayer->GetCharacter()->GetPos(), ClientId, pResult->GetString(1), 3);
+}
+
+void CGameContext::ConDropMoney(IConsole::IResult *pResult, void *pUserData)
+{
+	CGameContext *pSelf = (CGameContext *)pUserData;
+	const int ClientId = pResult->GetVictim();
+	CPlayer *pPlayer = pSelf->m_apPlayers[ClientId];
+	if(!pPlayer || !pPlayer->GetCharacter())
+		return;
+	const int64_t Amount = pResult->GetInteger(1);
+	pSelf->CreateMoney(pPlayer->GetCharacter()->GetPos(), Amount, ClientId, 0.f, true);
+}
+
 void CGameContext::RegisterFddraceAccountCommands()
 {
 	Console()->Register("register", "s[name] s[password] s[password]", CFGFLAG_CHAT | CFGFLAG_SERVER, ConRegister, this, "Register an account");
@@ -109,6 +130,8 @@ void CGameContext::RegisterFddraceAccountCommands()
 	Console()->Register("give_vipplus", "v[id]", CFGFLAG_SERVER, ConGiveVipPlus, this, "Grant VIP+ (account if logged in, else session)");
 	Console()->Register("jail_arrest", "v[id] i[seconds]", CFGFLAG_SERVER, ConJailArrest, this, "Arrest player for i seconds");
 	Console()->Register("jail_release", "v[id]", CFGFLAG_SERVER, ConJailRelease, this, "Release player from jail");
+	Console()->Register("laser_text", "v[id] r[text]", CFGFLAG_SERVER, ConLaserText, this, "Spawn laser text above player");
+	Console()->Register("drop_money", "v[id] i[amount]", CFGFLAG_SERVER, ConDropMoney, this, "Spawn money drop at player");
 }
 
 #endif

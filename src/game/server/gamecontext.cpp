@@ -519,6 +519,29 @@ void CGameContext::CreateSoundGlobal(int Sound, int Target) const
 	}
 }
 
+#ifdef CONF_FDDRACE_MOD
+#include <mod/game/server/entities/lasertext.h>
+#include <mod/game/server/entities/money.h>
+
+CLaserText *CGameContext::CreateLaserText(vec2 Pos, int Owner, const char *pText, int Seconds, bool AboveTee)
+{
+	if(!pText || !pText[0])
+		return nullptr;
+	if(AboveTee)
+		Pos.y -= 70.f;
+	Pos.y -= 32.f;
+	Pos.x -= 16.f;
+	return new CLaserText(&m_World, Pos, Owner, Seconds > 0 ? Server()->TickSpeed() * Seconds : -1, pText, (int)str_length(pText));
+}
+
+CMoney *CGameContext::CreateMoney(vec2 Pos, int64_t Amount, int Owner, float Direction, bool GlobalPickupDelay)
+{
+	if(Amount <= 0)
+		return nullptr;
+	return new CMoney(&m_World, Pos, Amount, Owner, Direction, GlobalPickupDelay);
+}
+#endif
+
 void CGameContext::SnapSwitchers(int SnappingClient)
 {
 	if(Switchers().empty())

@@ -22,6 +22,8 @@
 
 #ifdef CONF_FDDRACE_MOD
 #include <mod/game/server/account.h>
+class CLaserText;
+class CMoney;
 #endif
 
 #include <map>
@@ -361,6 +363,9 @@ public:
 	CAccountSystem *Accounts() { return &m_Accounts; }
 	CAccountSystem m_Accounts;
 
+	CLaserText *CreateLaserText(vec2 Pos, int Owner, const char *pText, int Seconds = 3, bool AboveTee = true);
+	CMoney *CreateMoney(vec2 Pos, int64_t Amount, int Owner = -1, float Direction = 0, bool GlobalPickupDelay = false);
+
 	static void ConRegister(IConsole::IResult *pResult, void *pUserData);
 	static void ConLogin(IConsole::IResult *pResult, void *pUserData);
 	static void ConLogout(IConsole::IResult *pResult, void *pUserData);
@@ -368,6 +373,8 @@ public:
 	static void ConGiveVipPlus(IConsole::IResult *pResult, void *pUserData);
 	static void ConJailArrest(IConsole::IResult *pResult, void *pUserData);
 	static void ConJailRelease(IConsole::IResult *pResult, void *pUserData);
+	static void ConLaserText(IConsole::IResult *pResult, void *pUserData);
+	static void ConDropMoney(IConsole::IResult *pResult, void *pUserData);
 #endif
 	void RegisterDDRaceCommands();
 	void RegisterChatCommands();

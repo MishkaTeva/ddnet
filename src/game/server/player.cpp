@@ -89,6 +89,8 @@ void CPlayer::Reset()
 #ifdef CONF_FDDRACE_MOD
 	m_HasRoomKey = false;
 	m_JailTime = 0;
+	m_JailArresting = false;
+	m_JailReleasing = false;
 #endif
 
 	m_SendVoteIndex = -1;

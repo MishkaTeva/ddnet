@@ -273,6 +273,8 @@ public:
 #ifdef CONF_FDDRACE_MOD
 	bool m_HasRoomKey = false;
 	int64_t m_JailTime = 0;
+	bool m_JailArresting = false;
+	bool m_JailReleasing = false;
 	int GetAccID() const;
 #endif
 };
