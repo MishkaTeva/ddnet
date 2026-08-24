@@ -393,6 +393,8 @@ public:
 	static void ConBanPlungerFx(IConsole::IResult *pResult, void *pUserData);
 	static void ConSpawnStableProjectile(IConsole::IResult *pResult, void *pUserData);
 	static void ConDropPickup(IConsole::IResult *pResult, void *pUserData);
+	static void ConSpawnCustomProjectile(IConsole::IResult *pResult, void *pUserData);
+	static void ConSpawnTeleporter(IConsole::IResult *pResult, void *pUserData);
 #endif
 	void RegisterDDRaceCommands();
 	void RegisterChatCommands();

@@ -1400,6 +1400,19 @@ int CCollision::GetPlotBySwitch(int SwitchId) const
 		return 0;
 	return SwitchId - m_HighestSwitchNumber;
 }
+
+void CCollision::SetTeleporter(vec2 Pos, int Type, int Number)
+{
+	if(!m_pTele)
+		return;
+
+	const int Nx = std::clamp(round_to_int(Pos.x) / 32, 0, m_Width - 1);
+	const int Ny = std::clamp(round_to_int(Pos.y) / 32, 0, m_Height - 1);
+	const int Index = Ny * m_Width + Nx;
+
+	m_pTele[Index].m_Number = (unsigned char)Number;
+	m_pTele[Index].m_Type = (unsigned char)Type;
+}
 #endif
 
 int CCollision::HighestSwitcherId() const

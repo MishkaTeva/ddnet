@@ -55,6 +55,10 @@ set(FDDRACE_MOD_GAME_SRC
   src/mod/game/server/entities/stable_projectile.h
   src/mod/game/server/entities/pickup_drop.cpp
   src/mod/game/server/entities/pickup_drop.h
+  src/mod/game/server/entities/custom_projectile.cpp
+  src/mod/game/server/entities/custom_projectile.h
+  src/mod/game/server/entities/teleporter.cpp
+  src/mod/game/server/entities/teleporter.h
 )
 
 set(FDDRACE_MOD_SRC

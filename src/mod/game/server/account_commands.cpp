@@ -6,9 +6,12 @@
 #include <game/server/gamecontext.h>
 #include <game/server/player.h>
 
+#include <game/mapitems.h>
+
 #include <mod/game/server/entities/atom.h>
 #include <mod/game/server/entities/ban_plunger_toilet.h>
 #include <mod/game/server/entities/clock.h>
+#include <mod/game/server/entities/custom_projectile.h>
 #include <mod/game/server/entities/epic_circle.h>
 #include <mod/game/server/entities/kick_boot.h>
 #include <mod/game/server/entities/lightsaber.h>
@@ -19,6 +22,7 @@
 #include <mod/game/server/entities/rotating_ball.h>
 #include <mod/game/server/entities/staff_ind.h>
 #include <mod/game/server/entities/stable_projectile.h>
+#include <mod/game/server/entities/teleporter.h>
 #include <mod/game/server/entities/trail.h>
 #include <mod/game/server/entities/unmute_spark.h>
 
@@ -429,6 +433,78 @@ void CGameContext::ConDropPickup(IConsole::IResult *pResult, void *pUserData)
 	pSelf->Console()->Print(IConsole::OUTPUT_LEVEL_STANDARD, "pickup_drop", "Dropped");
 }
 
+void CGameContext::ConSpawnCustomProjectile(IConsole::IResult *pResult, void *pUserData)
+{
+	CGameContext *pSelf = (CGameContext *)pUserData;
+	const int ClientId = pResult->GetVictim();
+	CCharacter *pChr = pSelf->GetPlayerChar(ClientId);
+	if(!pChr)
+		return;
+
+	const char *pKind = pResult->NumArguments() > 1 ? pResult->GetString(1) : "spooky";
+	bool Freeze = false, Explosive = false, Unfreeze = false, Bloody = false, Ghost = false, Spooky = false;
+	int Type = WEAPON_GUN;
+	if(!str_comp_nocase(pKind, "plasma"))
+	{
+		Explosive = true;
+		Unfreeze = true;
+		Type = CUSTOM_PROJ_TYPE_PLASMA;
+	}
+	else if(!str_comp_nocase(pKind, "heart"))
+	{
+		Type = CUSTOM_PROJ_TYPE_HEART;
+	}
+	else // spooky ghost gun
+	{
+		Bloody = true;
+		Ghost = true;
+		Spooky = true;
+		Type = WEAPON_GUN;
+	}
+
+	float Angle = pChr->Core()->m_Angle / 256.0f;
+	vec2 Dir = vec2(cosf(Angle), sinf(Angle));
+	if(length(Dir) < 0.001f)
+		Dir = vec2(1.f, 0.f);
+	new CCustomProjectile(&pSelf->m_World, ClientId, pChr->GetPos(), Dir, Freeze, Explosive, Unfreeze, Bloody, Ghost, Spooky, Type);
+	pSelf->Console()->Print(IConsole::OUTPUT_LEVEL_STANDARD, "custom_projectile", "Spawned");
+}
+
+void CGameContext::ConSpawnTeleporter(IConsole::IResult *pResult, void *pUserData)
+{
+	CGameContext *pSelf = (CGameContext *)pUserData;
+	const int ClientId = pResult->GetVictim();
+	CCharacter *pChr = pSelf->GetPlayerChar(ClientId);
+	if(!pChr)
+		return;
+
+	const char *pKind = pResult->NumArguments() > 1 ? pResult->GetString(1) : "out";
+	int Type = TILE_TELEOUT;
+	if(!str_comp_nocase(pKind, "weapon") || !str_comp_nocase(pKind, "inweapon"))
+		Type = TILE_TELEINWEAPON;
+	else if(!str_comp_nocase(pKind, "hook") || !str_comp_nocase(pKind, "inhook"))
+		Type = TILE_TELEINHOOK;
+	else if(!str_comp_nocase(pKind, "in"))
+		Type = TILE_TELEIN;
+	else if(str_comp_nocase(pKind, "out") != 0)
+	{
+		pSelf->Console()->Print(IConsole::OUTPUT_LEVEL_STANDARD, "teleporter", "kind: out|in|weapon|hook");
+		return;
+	}
+
+	int Number = pResult->NumArguments() > 2 ? pResult->GetInteger(2) : 1;
+	if(Number < 1)
+		Number = 1;
+	if(Number > 255)
+		Number = 255;
+
+	vec2 Pos = pChr->GetPos();
+	Pos.x = (float)(round_to_int(Pos.x) / 32 * 32 + 16);
+	Pos.y = (float)(round_to_int(Pos.y) / 32 * 32 + 16);
+	new CTeleporter(&pSelf->m_World, Pos, Type, Number);
+	pSelf->Console()->Print(IConsole::OUTPUT_LEVEL_STANDARD, "teleporter", "Spawned");
+}
+
 void CGameContext::RegisterFddraceAccountCommands()
 {
 	Console()->Register("register", "s[name] s[password] s[password]", CFGFLAG_CHAT | CFGFLAG_SERVER, ConRegister, this, "Register an account");
@@ -458,6 +534,8 @@ void CGameContext::RegisterFddraceAccountCommands()
 	Console()->Register("ban_plunger_fx", "v[id] ?i[seconds] ?r[reason]", CFGFLAG_SERVER, ConBanPlungerFx, this, "Spawn ban plunger VFX (bans after animation)");
 	Console()->Register("spawn_stable_projectile", "v[id] ?i[type] ?i[x] ?i[y]", CFGFLAG_SERVER, ConSpawnStableProjectile, this, "Spawn stable projectile (type: gun/shotgun/grenade ids)");
 	Console()->Register("drop_pickup", "v[id] ?s[kind] ?i[weapon]", CFGFLAG_SERVER, ConDropPickup, this, "Drop health/armor/weapon pickup (kind: health|armor|gun|shotgun|grenade|laser|ninja)");
+	Console()->Register("spawn_custom_projectile", "v[id] ?s[spooky|plasma|heart]", CFGFLAG_SERVER, ConSpawnCustomProjectile, this, "Fire custom projectile from player");
+	Console()->Register("spawn_teleporter", "v[id] ?s[out|in|weapon|hook] ?i[number]", CFGFLAG_SERVER, ConSpawnTeleporter, this, "Place runtime map teleporter at player tile");
 }
 
 #endif

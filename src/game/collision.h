@@ -148,6 +148,8 @@ public:
 	int GetSwitchByPlot(int PlotId) const;
 	int GetPlotBySwitch(int SwitchId) const;
 	bool IsPlotDoor(int SwitchId) const;
+	void SetTeleporter(vec2 Pos, int Type, int Number);
+	std::vector<vec2> &TeleOutsMutable(int Number) { return m_TeleOuts[Number]; }
 #endif
 
 	/**
