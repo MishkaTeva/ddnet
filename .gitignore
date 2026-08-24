@@ -155,3 +155,5 @@ tags
 
 # Local Discord bot secret — never commit
 discord_bot.token
+
+data/accounts/

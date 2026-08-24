@@ -269,6 +269,12 @@ public:
 
 	CSaveTee m_LastTeleTee;
 	std::optional<CSaveTee> m_LastDeath;
+
+#ifdef CONF_FDDRACE_MOD
+	bool m_HasRoomKey = false;
+	int64_t m_JailTime = 0;
+	int GetAccID() const;
+#endif
 };
 
 #endif

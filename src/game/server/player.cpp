@@ -86,6 +86,11 @@ void CPlayer::Reset()
 	m_Halloween = false;
 	m_FirstPacket = true;
 
+#ifdef CONF_FDDRACE_MOD
+	m_HasRoomKey = false;
+	m_JailTime = 0;
+#endif
+
 	m_SendVoteIndex = -1;
 	m_pLastSentVoteOption = nullptr;
 
@@ -198,6 +203,25 @@ void CPlayer::Tick()
 
 	if(!Server()->ClientIngame(m_ClientId))
 		return;
+
+#ifdef CONF_FDDRACE_MOD
+	if(m_JailTime > 1)
+	{
+		m_JailTime--;
+		if(m_JailTime == 1)
+		{
+			GameServer()->SendChatTarget(m_ClientId, "You have been released from jail");
+			m_JailTime = 0;
+			KillCharacter(WEAPON_GAME);
+		}
+		else if(Server()->Tick() % Server()->TickSpeed() == 0)
+		{
+			char aBuf[128];
+			str_format(aBuf, sizeof(aBuf), "You are arrested for %lld seconds", m_JailTime / Server()->TickSpeed());
+			GameServer()->SendBroadcast(aBuf, m_ClientId);
+		}
+	}
+#endif
 
 	if(m_ChatScore > 0)
 		m_ChatScore--;
@@ -626,6 +650,9 @@ void CPlayer::SendDisconnect(int FakeId)
 
 void CPlayer::OnDisconnect()
 {
+#ifdef CONF_FDDRACE_MOD
+	GameServer()->Accounts()->LogoutClient(m_ClientId, true);
+#endif
 	KillCharacter();
 
 	m_Moderating = false;
@@ -1156,3 +1183,10 @@ void CPlayer::CCameraInfo::Reset()
 	m_Deadzone = 0.0f;
 	m_FollowFactor = 0.0f;
 }
+
+#ifdef CONF_FDDRACE_MOD
+int CPlayer::GetAccID() const
+{
+	return GameServer()->Accounts()->FindByClientId(m_ClientId);
+}
+#endif

@@ -802,4 +802,6 @@ MACRO_CONFIG_INT(ClVideoRecorderFPS, cl_video_recorder_fps, 60, 1, 1000, CFGFLAG
 MACRO_CONFIG_INT(SvDiscordBridgePort, sv_discord_bridge_port, 0, 0, 65535, CFGFLAG_SERVER, "Port for Discord bridge HTTP server (0 = disabled)")
 MACRO_CONFIG_INT(SvMinClientVersion, sv_min_client_version, 0, 0, 99999, CFGFLAG_SERVER, "Minimum DDNet client version required to join (0 = allow all)")
 MACRO_CONFIG_INT(SvAnticheatMode, sv_anticheat_mode, 2, 0, 2, CFGFLAG_SERVER, "Anticheat mode (0=whitelist, 1=blacklist, 2=disabled)")
+MACRO_CONFIG_INT(SvAccounts, sv_accounts, 1, 0, 1, CFGFLAG_SERVER, "Enable slim F-DDrace account system")
+MACRO_CONFIG_STR(SvAccFilePath, sv_acc_file_path, 128, "data/accounts", CFGFLAG_SERVER, "Directory for slim account files")
 MACRO_CONFIG_STR(SvWebhookModLogURL, sv_webhook_mod_log_url, 128, "", CFGFLAG_SERVER, "Webhook URL for moderator logging")

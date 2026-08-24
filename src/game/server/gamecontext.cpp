@@ -1916,6 +1916,10 @@ void CGameContext::OnClientDrop(int ClientId, const char *pReason)
 {
 	LogEvent("Disconnect", ClientId);
 
+#ifdef CONF_FDDRACE_MOD
+	m_Accounts.LogoutClient(ClientId, true);
+#endif
+
 	AbortVoteKickOnDisconnect(ClientId);
 	m_pController->OnPlayerDisconnect(m_apPlayers[ClientId], pReason);
 	delete m_apPlayers[ClientId];
@@ -3982,6 +3986,7 @@ void CGameContext::OnConsoleInit()
 	RegisterDDRaceCommands();
 #ifdef CONF_FDDRACE_MOD
 	RegisterFddraceCompatCommands();
+	RegisterFddraceAccountCommands();
 #endif
 	RegisterChatCommands();
 }
@@ -4148,8 +4153,6 @@ void CGameContext::RegisterFddraceCompatCommands()
 		{nullptr, "list_saved_tees"},
 		{nullptr, "1vs1_global_create"},
 		{nullptr, "1vs1_global_start"},
-		{nullptr, "jail_arrest"},
-		{nullptr, "jail_release"},
 		{nullptr, "view_cursor"},
 		{nullptr, "view_cursor_zoomed"},
 		{nullptr, "whois"},
@@ -4290,85 +4293,83 @@ void CGameContext::RegisterFddraceCompatCommands()
 		{&s_aCompatCommands[49], "", CFGFLAG_SERVER, "F-DDrace: list_saved_tees (not ported yet)"},
 		{&s_aCompatCommands[50], "?i[scorelimit] ?i[killborder]", CFGFLAG_SERVER, "F-DDrace: 1vs1_global_create (not ported yet)"},
 		{&s_aCompatCommands[51], "i[id] i[id]", CFGFLAG_SERVER, "F-DDrace: 1vs1_global_start (not ported yet)"},
-		{&s_aCompatCommands[52], "v[id] i[seconds]", CFGFLAG_SERVER, "F-DDrace: jail_arrest (not ported yet)"},
-		{&s_aCompatCommands[53], "v[id]", CFGFLAG_SERVER, "F-DDrace: jail_release (not ported yet)"},
-		{&s_aCompatCommands[54], "?i[id]", CFGFLAG_SERVER, "F-DDrace: view_cursor (not ported yet)"},
-		{&s_aCompatCommands[55], "?i[id]", CFGFLAG_SERVER, "F-DDrace: view_cursor_zoomed (not ported yet)"},
-		{&s_aCompatCommands[56], "i[mode] i[cutoff] r[name]", CFGFLAG_SERVER, "F-DDrace: whois (not ported yet)"},
-		{&s_aCompatCommands[57], "i[mode] i[cutoff] v[id]", CFGFLAG_SERVER, "F-DDrace: whoisid (not ported yet)"},
-		{&s_aCompatCommands[58], "s[ip] ?s[reason]", CFGFLAG_SERVER, "F-DDrace: whitelist_add (not ported yet)"},
-		{&s_aCompatCommands[59], "s[ip/index]", CFGFLAG_SERVER, "F-DDrace: whitelist_remove (not ported yet)"},
-		{&s_aCompatCommands[60], "", CFGFLAG_SERVER, "F-DDrace: whitelist (not ported yet)"},
-		{&s_aCompatCommands[61], "", CFGFLAG_SERVER, "F-DDrace: bot_lookup (not ported yet)"},
-		{&s_aCompatCommands[62], "", CFGFLAG_SERVER, "F-DDrace: antibot_info (not ported yet)"},
-		{&s_aCompatCommands[63], "i[index]", CFGFLAG_SERVER, "F-DDrace: acc_sys_unban (not ported yet)"},
-		{&s_aCompatCommands[64], "", CFGFLAG_SERVER, "F-DDrace: acc_sys_bans (not ported yet)"},
-		{&s_aCompatCommands[65], "i[plotid] ?v[id]", CFGFLAG_SERVER | CMDFLAG_TEST, "F-DDrace: toteleplot (not ported yet)"},
-		{&s_aCompatCommands[66], "i[plotid]", CFGFLAG_SERVER, "F-DDrace: clearplot (not ported yet)"},
-		{&s_aCompatCommands[67], "s[username] i[plotid]", CFGFLAG_SERVER, "F-DDrace: plot_owner (not ported yet)"},
-		{&s_aCompatCommands[68], "i[plotid]", CFGFLAG_SERVER, "F-DDrace: plot_info (not ported yet)"},
-		{&s_aCompatCommands[69], "", CFGFLAG_SERVER, "F-DDrace: preset_list (not ported yet)"},
-		{&s_aCompatCommands[70], "", CFGFLAG_SERVER, "F-DDrace: reload_designs (not ported yet)"},
-		{&s_aCompatCommands[71], "", CFGFLAG_SERVER, "F-DDrace: reload_languages (not ported yet)"},
-		{&s_aCompatCommands[72], "", CFGFLAG_SERVER, "F-DDrace: list_loaded_languages (not ported yet)"},
-		{&s_aCompatCommands[73], "?v[id]", CFGFLAG_SERVER | CMDFLAG_TEST, "F-DDrace: add_grog (not ported yet)"},
-		{&s_aCompatCommands[74], "v[id] f[permille]", CFGFLAG_SERVER | CMDFLAG_TEST, "F-DDrace: set_permille (not ported yet)"},
-		{&s_aCompatCommands[75], "i[sound] ?v[id]", CFGFLAG_SERVER, "F-DDrace: sound (not ported yet)"},
-		{&s_aCompatCommands[76], "i[sound-id] ?v[id]", CFGFLAG_SERVER, "F-DDrace: map_sound (not ported yet)"},
-		{&s_aCompatCommands[77], "v[id] r[text]", CFGFLAG_SERVER, "F-DDrace: lasertext (not ported yet)"},
-		{&s_aCompatCommands[78], "v[id] i[footer] r[text]", CFGFLAG_SERVER, "F-DDrace: sendmotd (not ported yet)"},
-		{&s_aCompatCommands[79], "?v[id] ?i[turrettype] ?f[scale]", CFGFLAG_SERVER | CMDFLAG_TEST, "F-DDrace: helicopter (not ported yet)"},
-		{&s_aCompatCommands[80], "", CFGFLAG_SERVER, "F-DDrace: remove_helicopters (not ported yet)"},
-		{&s_aCompatCommands[81], "?v[id]", CFGFLAG_SERVER | CMDFLAG_TEST, "F-DDrace: snake (not ported yet)"},
-		{&s_aCompatCommands[82], "?v[id]", CFGFLAG_SERVER | CMDFLAG_TEST, "F-DDrace: force_transform_zombie (not ported yet)"},
-		{&s_aCompatCommands[83], "?v[id]", CFGFLAG_SERVER | CMDFLAG_TEST, "F-DDrace: force_transform_human (not ported yet)"},
-		{&s_aCompatCommands[84], "v[id] i[amount]", CFGFLAG_SERVER | CMDFLAG_TEST, "F-DDrace: set_double_xp_lifes (not ported yet)"},
-		{&s_aCompatCommands[85], "v[id] i[percentage]", CFGFLAG_SERVER | CMDFLAG_TEST, "F-DDrace: set_taser_shield (not ported yet)"},
-		{&s_aCompatCommands[86], "v[id] ?r[name]", CFGFLAG_SERVER, "F-DDrace: player_name (not ported yet)"},
-		{&s_aCompatCommands[87], "v[id] ?r[clan]", CFGFLAG_SERVER, "F-DDrace: player_clan (not ported yet)"},
-		{&s_aCompatCommands[88], "v[id] ?r[skin]", CFGFLAG_SERVER, "F-DDrace: player_skin (not ported yet)"},
-		{&s_aCompatCommands[89], "v[id]", CFGFLAG_SERVER, "F-DDrace: playerinfo (not ported yet)"},
-		{&s_aCompatCommands[90], "v[id] i[item]", CFGFLAG_SERVER, "F-DDrace: item (not ported yet)"},
-		{&s_aCompatCommands[91], "?v[id]", CFGFLAG_SERVER | CMDFLAG_TEST, "F-DDrace: invisible (not ported yet)"},
-		{&s_aCompatCommands[92], "?s[power] ?v[id]", CFGFLAG_SERVER, "F-DDrace: hookpower (not ported yet)"},
-		{&s_aCompatCommands[93], "?v[id]", CFGFLAG_SERVER | CMDFLAG_TEST, "F-DDrace: freezehammer (not ported yet)"},
-		{&s_aCompatCommands[94], "?v[id] ?i[jumps]", CFGFLAG_SERVER | CMDFLAG_TEST, "F-DDrace: setjumps (not ported yet)"},
-		{&s_aCompatCommands[95], "?v[id]", CFGFLAG_SERVER | CMDFLAG_TEST, "F-DDrace: infinitejumps (not ported yet)"},
-		{&s_aCompatCommands[96], "?v[id] ?i[speed]", CFGFLAG_SERVER, "F-DDrace: rainbowspeed (not ported yet)"},
-		{&s_aCompatCommands[97], "?v[id]", CFGFLAG_SERVER, "F-DDrace: rainbow (not ported yet)"},
-		{&s_aCompatCommands[98], "?v[id]", CFGFLAG_SERVER, "F-DDrace: infrainbow (not ported yet)"},
-		{&s_aCompatCommands[99], "?v[id]", CFGFLAG_SERVER, "F-DDrace: atom (not ported yet)"},
-		{&s_aCompatCommands[100], "?v[id]", CFGFLAG_SERVER, "F-DDrace: trail (not ported yet)"},
-		{&s_aCompatCommands[101], "?v[id]", CFGFLAG_SERVER, "F-DDrace: spookyghost (not ported yet)"},
-		{&s_aCompatCommands[102], "?v[id]", CFGFLAG_SERVER, "F-DDrace: addmeteor (not ported yet)"},
-		{&s_aCompatCommands[103], "?v[id]", CFGFLAG_SERVER, "F-DDrace: addinfmeteor (not ported yet)"},
-		{&s_aCompatCommands[104], "?v[id]", CFGFLAG_SERVER, "F-DDrace: removemeteors (not ported yet)"},
-		{&s_aCompatCommands[105], "?v[id]", CFGFLAG_SERVER | CMDFLAG_TEST, "F-DDrace: passive (not ported yet)"},
-		{&s_aCompatCommands[106], "?v[id]", CFGFLAG_SERVER, "F-DDrace: vanillamode (not ported yet)"},
-		{&s_aCompatCommands[107], "?v[id]", CFGFLAG_SERVER, "F-DDrace: ddracemode (not ported yet)"},
-		{&s_aCompatCommands[108], "?v[id]", CFGFLAG_SERVER, "F-DDrace: bloody (not ported yet)"},
-		{&s_aCompatCommands[109], "?v[id]", CFGFLAG_SERVER, "F-DDrace: strongbloody (not ported yet)"},
-		{&s_aCompatCommands[110], "?v[id]", CFGFLAG_SERVER | CMDFLAG_TEST, "F-DDrace: alwaysteleweapon (not ported yet)"},
-		{&s_aCompatCommands[111], "?v[id]", CFGFLAG_SERVER | CMDFLAG_TEST, "F-DDrace: telegun (not ported yet)"},
-		{&s_aCompatCommands[112], "?v[id]", CFGFLAG_SERVER | CMDFLAG_TEST, "F-DDrace: telegrenade (not ported yet)"},
-		{&s_aCompatCommands[113], "?v[id]", CFGFLAG_SERVER | CMDFLAG_TEST, "F-DDrace: telelaser (not ported yet)"},
-		{&s_aCompatCommands[114], "?v[id]", CFGFLAG_SERVER | CMDFLAG_TEST, "F-DDrace: doorhammer (not ported yet)"},
-		{&s_aCompatCommands[115], "?v[id]", CFGFLAG_SERVER, "F-DDrace: lovely (not ported yet)"},
-		{&s_aCompatCommands[116], "?v[id]", CFGFLAG_SERVER, "F-DDrace: rotatingball (not ported yet)"},
-		{&s_aCompatCommands[117], "?v[id]", CFGFLAG_SERVER, "F-DDrace: epiccircle (not ported yet)"},
-		{&s_aCompatCommands[118], "?v[id]", CFGFLAG_SERVER, "F-DDrace: staffind (not ported yet)"},
-		{&s_aCompatCommands[119], "?v[id]", CFGFLAG_SERVER, "F-DDrace: rainbowname (not ported yet)"},
-		{&s_aCompatCommands[120], "?v[id]", CFGFLAG_SERVER, "F-DDrace: confetti (not ported yet)"},
-		{&s_aCompatCommands[121], "?v[id]", CFGFLAG_SERVER, "F-DDrace: sparkle (not ported yet)"},
-		{&s_aCompatCommands[122], "i[port]", CFGFLAG_SERVER, "F-DDrace: acc_logout_port (not ported yet)"},
-		{&s_aCompatCommands[123], "s[username]", CFGFLAG_SERVER, "F-DDrace: acc_logout (not ported yet)"},
-		{&s_aCompatCommands[124], "s[username]", CFGFLAG_SERVER, "F-DDrace: acc_disable (not ported yet)"},
-		{&s_aCompatCommands[125], "s[username]", CFGFLAG_SERVER, "F-DDrace: acc_info (not ported yet)"},
-		{&s_aCompatCommands[126], "s[username] f[amount]", CFGFLAG_SERVER, "F-DDrace: acc_add_euros (not ported yet)"},
-		{&s_aCompatCommands[127], "s[username] s[variable] ?r[value]", CFGFLAG_SERVER, "F-DDrace: acc_edit (not ported yet)"},
-		{&s_aCompatCommands[128], "i[level]", CFGFLAG_SERVER, "F-DDrace: acc_level_needed_xp (not ported yet)"},
-		{&s_aCompatCommands[129], "r[message]", CFGFLAG_SERVER, "F-DDrace: server_alert (not ported yet)"},
-		{&s_aCompatCommands[130], "v[id] r[message]", CFGFLAG_SERVER, "F-DDrace: mod_alert (not ported yet)"},
+		{&s_aCompatCommands[52], "?i[id]", CFGFLAG_SERVER, "F-DDrace: view_cursor (not ported yet)"},
+		{&s_aCompatCommands[53], "?i[id]", CFGFLAG_SERVER, "F-DDrace: view_cursor_zoomed (not ported yet)"},
+		{&s_aCompatCommands[54], "i[mode] i[cutoff] r[name]", CFGFLAG_SERVER, "F-DDrace: whois (not ported yet)"},
+		{&s_aCompatCommands[55], "i[mode] i[cutoff] v[id]", CFGFLAG_SERVER, "F-DDrace: whoisid (not ported yet)"},
+		{&s_aCompatCommands[56], "s[ip] ?s[reason]", CFGFLAG_SERVER, "F-DDrace: whitelist_add (not ported yet)"},
+		{&s_aCompatCommands[57], "s[ip/index]", CFGFLAG_SERVER, "F-DDrace: whitelist_remove (not ported yet)"},
+		{&s_aCompatCommands[58], "", CFGFLAG_SERVER, "F-DDrace: whitelist (not ported yet)"},
+		{&s_aCompatCommands[59], "", CFGFLAG_SERVER, "F-DDrace: bot_lookup (not ported yet)"},
+		{&s_aCompatCommands[60], "", CFGFLAG_SERVER, "F-DDrace: antibot_info (not ported yet)"},
+		{&s_aCompatCommands[61], "i[index]", CFGFLAG_SERVER, "F-DDrace: acc_sys_unban (not ported yet)"},
+		{&s_aCompatCommands[62], "", CFGFLAG_SERVER, "F-DDrace: acc_sys_bans (not ported yet)"},
+		{&s_aCompatCommands[63], "i[plotid] ?v[id]", CFGFLAG_SERVER | CMDFLAG_TEST, "F-DDrace: toteleplot (not ported yet)"},
+		{&s_aCompatCommands[64], "i[plotid]", CFGFLAG_SERVER, "F-DDrace: clearplot (not ported yet)"},
+		{&s_aCompatCommands[65], "s[username] i[plotid]", CFGFLAG_SERVER, "F-DDrace: plot_owner (not ported yet)"},
+		{&s_aCompatCommands[66], "i[plotid]", CFGFLAG_SERVER, "F-DDrace: plot_info (not ported yet)"},
+		{&s_aCompatCommands[67], "", CFGFLAG_SERVER, "F-DDrace: preset_list (not ported yet)"},
+		{&s_aCompatCommands[68], "", CFGFLAG_SERVER, "F-DDrace: reload_designs (not ported yet)"},
+		{&s_aCompatCommands[69], "", CFGFLAG_SERVER, "F-DDrace: reload_languages (not ported yet)"},
+		{&s_aCompatCommands[70], "", CFGFLAG_SERVER, "F-DDrace: list_loaded_languages (not ported yet)"},
+		{&s_aCompatCommands[71], "?v[id]", CFGFLAG_SERVER | CMDFLAG_TEST, "F-DDrace: add_grog (not ported yet)"},
+		{&s_aCompatCommands[72], "v[id] f[permille]", CFGFLAG_SERVER | CMDFLAG_TEST, "F-DDrace: set_permille (not ported yet)"},
+		{&s_aCompatCommands[73], "i[sound] ?v[id]", CFGFLAG_SERVER, "F-DDrace: sound (not ported yet)"},
+		{&s_aCompatCommands[74], "i[sound-id] ?v[id]", CFGFLAG_SERVER, "F-DDrace: map_sound (not ported yet)"},
+		{&s_aCompatCommands[75], "v[id] r[text]", CFGFLAG_SERVER, "F-DDrace: lasertext (not ported yet)"},
+		{&s_aCompatCommands[76], "v[id] i[footer] r[text]", CFGFLAG_SERVER, "F-DDrace: sendmotd (not ported yet)"},
+		{&s_aCompatCommands[77], "?v[id] ?i[turrettype] ?f[scale]", CFGFLAG_SERVER | CMDFLAG_TEST, "F-DDrace: helicopter (not ported yet)"},
+		{&s_aCompatCommands[78], "", CFGFLAG_SERVER, "F-DDrace: remove_helicopters (not ported yet)"},
+		{&s_aCompatCommands[79], "?v[id]", CFGFLAG_SERVER | CMDFLAG_TEST, "F-DDrace: snake (not ported yet)"},
+		{&s_aCompatCommands[80], "?v[id]", CFGFLAG_SERVER | CMDFLAG_TEST, "F-DDrace: force_transform_zombie (not ported yet)"},
+		{&s_aCompatCommands[81], "?v[id]", CFGFLAG_SERVER | CMDFLAG_TEST, "F-DDrace: force_transform_human (not ported yet)"},
+		{&s_aCompatCommands[82], "v[id] i[amount]", CFGFLAG_SERVER | CMDFLAG_TEST, "F-DDrace: set_double_xp_lifes (not ported yet)"},
+		{&s_aCompatCommands[83], "v[id] i[percentage]", CFGFLAG_SERVER | CMDFLAG_TEST, "F-DDrace: set_taser_shield (not ported yet)"},
+		{&s_aCompatCommands[84], "v[id] ?r[name]", CFGFLAG_SERVER, "F-DDrace: player_name (not ported yet)"},
+		{&s_aCompatCommands[85], "v[id] ?r[clan]", CFGFLAG_SERVER, "F-DDrace: player_clan (not ported yet)"},
+		{&s_aCompatCommands[86], "v[id] ?r[skin]", CFGFLAG_SERVER, "F-DDrace: player_skin (not ported yet)"},
+		{&s_aCompatCommands[87], "v[id]", CFGFLAG_SERVER, "F-DDrace: playerinfo (not ported yet)"},
+		{&s_aCompatCommands[88], "v[id] i[item]", CFGFLAG_SERVER, "F-DDrace: item (not ported yet)"},
+		{&s_aCompatCommands[89], "?v[id]", CFGFLAG_SERVER | CMDFLAG_TEST, "F-DDrace: invisible (not ported yet)"},
+		{&s_aCompatCommands[90], "?s[power] ?v[id]", CFGFLAG_SERVER, "F-DDrace: hookpower (not ported yet)"},
+		{&s_aCompatCommands[91], "?v[id]", CFGFLAG_SERVER | CMDFLAG_TEST, "F-DDrace: freezehammer (not ported yet)"},
+		{&s_aCompatCommands[92], "?v[id] ?i[jumps]", CFGFLAG_SERVER | CMDFLAG_TEST, "F-DDrace: setjumps (not ported yet)"},
+		{&s_aCompatCommands[93], "?v[id]", CFGFLAG_SERVER | CMDFLAG_TEST, "F-DDrace: infinitejumps (not ported yet)"},
+		{&s_aCompatCommands[94], "?v[id] ?i[speed]", CFGFLAG_SERVER, "F-DDrace: rainbowspeed (not ported yet)"},
+		{&s_aCompatCommands[95], "?v[id]", CFGFLAG_SERVER, "F-DDrace: rainbow (not ported yet)"},
+		{&s_aCompatCommands[96], "?v[id]", CFGFLAG_SERVER, "F-DDrace: infrainbow (not ported yet)"},
+		{&s_aCompatCommands[97], "?v[id]", CFGFLAG_SERVER, "F-DDrace: atom (not ported yet)"},
+		{&s_aCompatCommands[98], "?v[id]", CFGFLAG_SERVER, "F-DDrace: trail (not ported yet)"},
+		{&s_aCompatCommands[99], "?v[id]", CFGFLAG_SERVER, "F-DDrace: spookyghost (not ported yet)"},
+		{&s_aCompatCommands[100], "?v[id]", CFGFLAG_SERVER, "F-DDrace: addmeteor (not ported yet)"},
+		{&s_aCompatCommands[101], "?v[id]", CFGFLAG_SERVER, "F-DDrace: addinfmeteor (not ported yet)"},
+		{&s_aCompatCommands[102], "?v[id]", CFGFLAG_SERVER, "F-DDrace: removemeteors (not ported yet)"},
+		{&s_aCompatCommands[103], "?v[id]", CFGFLAG_SERVER | CMDFLAG_TEST, "F-DDrace: passive (not ported yet)"},
+		{&s_aCompatCommands[104], "?v[id]", CFGFLAG_SERVER, "F-DDrace: vanillamode (not ported yet)"},
+		{&s_aCompatCommands[105], "?v[id]", CFGFLAG_SERVER, "F-DDrace: ddracemode (not ported yet)"},
+		{&s_aCompatCommands[106], "?v[id]", CFGFLAG_SERVER, "F-DDrace: bloody (not ported yet)"},
+		{&s_aCompatCommands[107], "?v[id]", CFGFLAG_SERVER, "F-DDrace: strongbloody (not ported yet)"},
+		{&s_aCompatCommands[108], "?v[id]", CFGFLAG_SERVER | CMDFLAG_TEST, "F-DDrace: alwaysteleweapon (not ported yet)"},
+		{&s_aCompatCommands[109], "?v[id]", CFGFLAG_SERVER | CMDFLAG_TEST, "F-DDrace: telegun (not ported yet)"},
+		{&s_aCompatCommands[110], "?v[id]", CFGFLAG_SERVER | CMDFLAG_TEST, "F-DDrace: telegrenade (not ported yet)"},
+		{&s_aCompatCommands[111], "?v[id]", CFGFLAG_SERVER | CMDFLAG_TEST, "F-DDrace: telelaser (not ported yet)"},
+		{&s_aCompatCommands[112], "?v[id]", CFGFLAG_SERVER | CMDFLAG_TEST, "F-DDrace: doorhammer (not ported yet)"},
+		{&s_aCompatCommands[113], "?v[id]", CFGFLAG_SERVER, "F-DDrace: lovely (not ported yet)"},
+		{&s_aCompatCommands[114], "?v[id]", CFGFLAG_SERVER, "F-DDrace: rotatingball (not ported yet)"},
+		{&s_aCompatCommands[115], "?v[id]", CFGFLAG_SERVER, "F-DDrace: epiccircle (not ported yet)"},
+		{&s_aCompatCommands[116], "?v[id]", CFGFLAG_SERVER, "F-DDrace: staffind (not ported yet)"},
+		{&s_aCompatCommands[117], "?v[id]", CFGFLAG_SERVER, "F-DDrace: rainbowname (not ported yet)"},
+		{&s_aCompatCommands[118], "?v[id]", CFGFLAG_SERVER, "F-DDrace: confetti (not ported yet)"},
+		{&s_aCompatCommands[119], "?v[id]", CFGFLAG_SERVER, "F-DDrace: sparkle (not ported yet)"},
+		{&s_aCompatCommands[120], "i[port]", CFGFLAG_SERVER, "F-DDrace: acc_logout_port (not ported yet)"},
+		{&s_aCompatCommands[121], "s[username]", CFGFLAG_SERVER, "F-DDrace: acc_logout (not ported yet)"},
+		{&s_aCompatCommands[122], "s[username]", CFGFLAG_SERVER, "F-DDrace: acc_disable (not ported yet)"},
+		{&s_aCompatCommands[123], "s[username]", CFGFLAG_SERVER, "F-DDrace: acc_info (not ported yet)"},
+		{&s_aCompatCommands[124], "s[username] f[amount]", CFGFLAG_SERVER, "F-DDrace: acc_add_euros (not ported yet)"},
+		{&s_aCompatCommands[125], "s[username] s[variable] ?r[value]", CFGFLAG_SERVER, "F-DDrace: acc_edit (not ported yet)"},
+		{&s_aCompatCommands[126], "i[level]", CFGFLAG_SERVER, "F-DDrace: acc_level_needed_xp (not ported yet)"},
+		{&s_aCompatCommands[127], "r[message]", CFGFLAG_SERVER, "F-DDrace: server_alert (not ported yet)"},
+		{&s_aCompatCommands[128], "v[id] r[message]", CFGFLAG_SERVER, "F-DDrace: mod_alert (not ported yet)"},
 	};
 
 	for(auto &Registration : s_aRegistrations)
@@ -4690,6 +4691,10 @@ void CGameContext::OnInit(const void *pPersistentData)
 	CreateAllEntities(true);
 
 	m_pAntibot->RoundStart(this);
+
+#ifdef CONF_FDDRACE_MOD
+	m_Accounts.Init(this);
+#endif
 }
 
 void CGameContext::CreateAllEntities(bool Initial)
@@ -4950,6 +4955,10 @@ bool CGameContext::OnMapChange(char *pNewMapName, int MapNameSize)
 
 void CGameContext::OnShutdown(void *pPersistentData)
 {
+#ifdef CONF_FDDRACE_MOD
+	m_Accounts.Shutdown();
+#endif
+
 	CPersistentData *pPersistent = (CPersistentData *)pPersistentData;
 
 	if(pPersistent)

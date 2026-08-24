@@ -110,6 +110,10 @@ bool CCharacter::Spawn(CPlayer *pPlayer, vec2 Pos)
 
 	DDRaceInit();
 
+#ifdef CONF_FDDRACE_MOD
+	GameServer()->Accounts()->SyncMoveRestrictions(m_pPlayer);
+#endif
+
 	m_TuneZone = TuneZone;
 	m_TuneZoneOld = -1; // no zone leave msg on spawn
 	m_NeededFaketuning = 0; // reset fake tunings on respawn and send the client

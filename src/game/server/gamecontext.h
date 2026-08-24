@@ -20,6 +20,10 @@
 #include <game/mapbugs.h>
 #include <game/voting.h>
 
+#ifdef CONF_FDDRACE_MOD
+#include <mod/game/server/account.h>
+#endif
+
 #include <map>
 #include <memory>
 #include <optional>
@@ -352,12 +356,21 @@ public:
 	void OnConsoleInit() override;
 #ifdef CONF_FDDRACE_MOD
 	void HandleDiscordMessage(const char *pUsername, const char *pUserID, const char *pText, const char *pEvent = nullptr);
+	void RegisterFddraceCompatCommands();
+	void RegisterFddraceAccountCommands();
+	CAccountSystem *Accounts() { return &m_Accounts; }
+	CAccountSystem m_Accounts;
+
+	static void ConRegister(IConsole::IResult *pResult, void *pUserData);
+	static void ConLogin(IConsole::IResult *pResult, void *pUserData);
+	static void ConLogout(IConsole::IResult *pResult, void *pUserData);
+	static void ConGiveRoomKey(IConsole::IResult *pResult, void *pUserData);
+	static void ConGiveVipPlus(IConsole::IResult *pResult, void *pUserData);
+	static void ConJailArrest(IConsole::IResult *pResult, void *pUserData);
+	static void ConJailRelease(IConsole::IResult *pResult, void *pUserData);
 #endif
 	void RegisterDDRaceCommands();
 	void RegisterChatCommands();
-#ifdef CONF_FDDRACE_MOD
-	void RegisterFddraceCompatCommands();
-#endif
 	[[nodiscard]] bool OnMapChange(char *pNewMapName, int MapNameSize) override;
 	void OnShutdown(void *pPersistentData) override;
 

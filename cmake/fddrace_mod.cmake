@@ -10,6 +10,9 @@ set(FDDRACE_MOD_ENGINE_SRC
 )
 
 set(FDDRACE_MOD_GAME_SRC
+  src/mod/game/server/account.cpp
+  src/mod/game/server/account.h
+  src/mod/game/server/account_commands.cpp
   src/mod/game/server/versioncheck.cpp
   src/mod/game/server/versioncheck.h
 )
