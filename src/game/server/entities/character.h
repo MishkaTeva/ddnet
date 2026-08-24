@@ -299,6 +299,8 @@ public:
 	bool m_Trail = false;
 	bool m_EpicCircle = false;
 	int m_Meteors = 0;
+	bool m_IsPortalBlocker = false;
+	class CPortalBlocker *m_pPortalBlocker = nullptr;
 	class CLightsaber *m_pLightsaber = nullptr;
 #endif
 };

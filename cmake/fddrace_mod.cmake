@@ -63,6 +63,10 @@ set(FDDRACE_MOD_GAME_SRC
   src/mod/game/server/entities/meteor.h
   src/mod/game/server/entities/playercounter.cpp
   src/mod/game/server/entities/playercounter.h
+  src/mod/game/server/entities/taser_shield.cpp
+  src/mod/game/server/entities/taser_shield.h
+  src/mod/game/server/entities/portalblocker.cpp
+  src/mod/game/server/entities/portalblocker.h
 )
 
 set(FDDRACE_MOD_SRC

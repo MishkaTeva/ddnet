@@ -399,6 +399,8 @@ public:
 	static void ConClearMeteors(IConsole::IResult *pResult, void *pUserData);
 	static void ConSpawnPlayerCounter(IConsole::IResult *pResult, void *pUserData);
 	static void ConUpdatePlayerCounter(IConsole::IResult *pResult, void *pUserData);
+	static void ConTaserShieldFx(IConsole::IResult *pResult, void *pUserData);
+	static void ConPortalBlocker(IConsole::IResult *pResult, void *pUserData);
 #endif
 	void RegisterDDRaceCommands();
 	void RegisterChatCommands();

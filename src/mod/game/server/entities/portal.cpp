@@ -1,6 +1,7 @@
 #include "portal.h"
 
 #include "money.h"
+#include "portalblocker.h"
 
 #include <algorithm>
 
@@ -127,6 +128,18 @@ void CPortal::CharactersEnter()
 		if(GameServer()->Collision()->IntersectLine(m_Pos, pChr->GetPos(), nullptr, nullptr))
 			continue;
 
+		bool Blocked = false;
+		for(CPortalBlocker *pBlocker = (CPortalBlocker *)GameWorld()->FindFirst(CGameWorld::ENTTYPE_PORTAL_BLOCKER); pBlocker; pBlocker = (CPortalBlocker *)pBlocker->TypeNext())
+		{
+			if(pBlocker->BlocksSegment(m_Pos, pChr->GetPos()))
+			{
+				Blocked = true;
+				break;
+			}
+		}
+		if(Blocked)
+			continue;
+
 		pChr->ReleaseHook();
 		pChr->SetPosition(m_pLinkedPortal->m_Pos);
 		pChr->ResetVelocity();
@@ -152,6 +165,18 @@ void CPortal::CharactersEnter()
 		if(std::find(m_vTeleported.begin(), m_vTeleported.end(), pMoney) != m_vTeleported.end())
 			continue;
 		if(GameServer()->Collision()->IntersectLine(m_Pos, pMoney->GetPos(), nullptr, nullptr))
+			continue;
+
+		bool Blocked = false;
+		for(CPortalBlocker *pBlocker = (CPortalBlocker *)GameWorld()->FindFirst(CGameWorld::ENTTYPE_PORTAL_BLOCKER); pBlocker; pBlocker = (CPortalBlocker *)pBlocker->TypeNext())
+		{
+			if(pBlocker->BlocksSegment(m_Pos, pMoney->GetPos()))
+			{
+				Blocked = true;
+				break;
+			}
+		}
+		if(Blocked)
 			continue;
 
 		pMoney->m_Pos = m_pLinkedPortal->m_Pos;

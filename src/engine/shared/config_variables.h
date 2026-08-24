@@ -810,3 +810,6 @@ MACRO_CONFIG_INT(SvPortalDetonation, sv_portal_detonation, 10, 0, 60, CFGFLAG_SE
 MACRO_CONFIG_INT(SvPortalDetonationLinked, sv_portal_detonation_linked, 5, 0, 60, CFGFLAG_SERVER, "Seconds until linked portals detonate")
 MACRO_CONFIG_INT(SvDestroyDropsOnLeave, sv_destroy_drops_on_leave, 0, 0, 1, CFGFLAG_SERVER, "Destroy dropped pickups when their owner disconnects")
 MACRO_CONFIG_INT(SvLightTeleporters, sv_light_teleporters, 1, 0, 1, CFGFLAG_SERVER, "Lightweight draw-editor teleporter visuals")
+MACRO_CONFIG_INT(SvPortalBlockerDetonation, sv_portal_blocker_detonation, 30, 1, 600, CFGFLAG_SERVER, "Seconds until a placed portal blocker detonates")
+MACRO_CONFIG_INT(SvPortalBlockerMaxLength, sv_portal_blocker_max_length, 20, 0, 1000, CFGFLAG_SERVER, "Max portal blocker length in tiles (0 = unlimited)")
+MACRO_CONFIG_INT(SvPortalMaxDistance, sv_portal_max_distance, 1000, 0, 10000, CFGFLAG_SERVER, "Max distance to place portals / portal blockers")

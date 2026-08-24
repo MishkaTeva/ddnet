@@ -21,10 +21,12 @@
 #include <mod/game/server/entities/pickup_drop.h>
 #include <mod/game/server/entities/playercounter.h>
 #include <mod/game/server/entities/portal.h>
+#include <mod/game/server/entities/portalblocker.h>
 #include <mod/game/server/entities/rotating_ball.h>
 #include <mod/game/server/entities/staff_ind.h>
 #include <mod/game/server/entities/stable_projectile.h>
 #include <mod/game/server/entities/teleporter.h>
+#include <mod/game/server/entities/taser_shield.h>
 #include <mod/game/server/entities/trail.h>
 #include <mod/game/server/entities/unmute_spark.h>
 
@@ -558,6 +560,43 @@ void CGameContext::ConUpdatePlayerCounter(IConsole::IResult *pResult, void *pUse
 		pEnt->OnUpdate(Port, Count);
 }
 
+void CGameContext::ConTaserShieldFx(IConsole::IResult *pResult, void *pUserData)
+{
+	CGameContext *pSelf = (CGameContext *)pUserData;
+	const int ClientId = pResult->GetVictim();
+	CCharacter *pChr = pSelf->GetPlayerChar(ClientId);
+	if(!pChr)
+		return;
+	new CTaserShield(&pSelf->m_World, pChr->GetPos(), ClientId);
+	pSelf->Console()->Print(IConsole::OUTPUT_LEVEL_STANDARD, "taser_shield", "Spawned");
+}
+
+void CGameContext::ConPortalBlocker(IConsole::IResult *pResult, void *pUserData)
+{
+	CGameContext *pSelf = (CGameContext *)pUserData;
+	const int ClientId = pResult->GetVictim();
+	CCharacter *pChr = pSelf->GetPlayerChar(ClientId);
+	if(!pChr)
+		return;
+
+	const char *pAction = pResult->NumArguments() > 1 ? pResult->GetString(1) : "start";
+	if(!str_comp_nocase(pAction, "place"))
+	{
+		if(pChr->m_pPortalBlocker)
+			pChr->m_pPortalBlocker->OnPlace();
+		return;
+	}
+
+	if(pChr->m_pPortalBlocker)
+	{
+		pChr->m_pPortalBlocker->Cancel();
+		pChr->m_pPortalBlocker = nullptr;
+	}
+	pChr->m_IsPortalBlocker = true;
+	pChr->m_pPortalBlocker = new CPortalBlocker(&pSelf->m_World, pChr->GetPos(), ClientId);
+	pSelf->Console()->Print(IConsole::OUTPUT_LEVEL_STANDARD, "portalblocker", "Preview started; use portal_blocker <id> place twice");
+}
+
 void CGameContext::RegisterFddraceAccountCommands()
 {
 	Console()->Register("register", "s[name] s[password] s[password]", CFGFLAG_CHAT | CFGFLAG_SERVER, ConRegister, this, "Register an account");
@@ -593,6 +632,8 @@ void CGameContext::RegisterFddraceAccountCommands()
 	Console()->Register("clear_meteors", "v[id]", CFGFLAG_SERVER, ConClearMeteors, this, "Clear meteor counters for player");
 	Console()->Register("spawn_playercounter", "v[id] ?i[port]", CFGFLAG_SERVER, ConSpawnPlayerCounter, this, "Spawn laser player-count display");
 	Console()->Register("update_playercounter", "i[port] i[count]", CFGFLAG_SERVER, ConUpdatePlayerCounter, this, "Update player counters for a port");
+	Console()->Register("taser_shield_fx", "v[id]", CFGFLAG_SERVER, ConTaserShieldFx, this, "Spawn taser shield armor VFX on player");
+	Console()->Register("portal_blocker", "v[id] ?s[start|place]", CFGFLAG_SERVER, ConPortalBlocker, this, "Start portal blocker preview or place endpoint");
 }
 
 #endif
