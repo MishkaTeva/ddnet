@@ -381,6 +381,8 @@ public:
 	static void ConSpawnFlyingPoint(IConsole::IResult *pResult, void *pUserData);
 	static void ConToggleRotatingBall(IConsole::IResult *pResult, void *pUserData);
 	static void ConToggleAtom(IConsole::IResult *pResult, void *pUserData);
+	static void ConToggleTrail(IConsole::IResult *pResult, void *pUserData);
+	static void ConToggleEpicCircle(IConsole::IResult *pResult, void *pUserData);
 #endif
 	void RegisterDDRaceCommands();
 	void RegisterChatCommands();

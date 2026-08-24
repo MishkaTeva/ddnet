@@ -33,6 +33,10 @@ set(FDDRACE_MOD_GAME_SRC
   src/mod/game/server/entities/rotating_ball.h
   src/mod/game/server/entities/atom.cpp
   src/mod/game/server/entities/atom.h
+  src/mod/game/server/entities/trail.cpp
+  src/mod/game/server/entities/trail.h
+  src/mod/game/server/entities/epic_circle.cpp
+  src/mod/game/server/entities/epic_circle.h
 )
 
 set(FDDRACE_MOD_SRC

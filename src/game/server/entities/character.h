@@ -296,6 +296,8 @@ public:
 	bool m_StaffInd = false;
 	bool m_RotatingBall = false;
 	bool m_Atom = false;
+	bool m_Trail = false;
+	bool m_EpicCircle = false;
 #endif
 };
 

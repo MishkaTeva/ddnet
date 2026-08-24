@@ -7,9 +7,11 @@
 #include <game/server/player.h>
 
 #include <mod/game/server/entities/atom.h>
+#include <mod/game/server/entities/epic_circle.h>
 #include <mod/game/server/entities/lovely.h>
 #include <mod/game/server/entities/rotating_ball.h>
 #include <mod/game/server/entities/staff_ind.h>
+#include <mod/game/server/entities/trail.h>
 
 #ifdef CONF_FDDRACE_MOD
 
@@ -188,6 +190,32 @@ void CGameContext::ConToggleAtom(IConsole::IResult *pResult, void *pUserData)
 	pSelf->Console()->Print(IConsole::OUTPUT_LEVEL_STANDARD, "cosmetics", pChr->m_Atom ? "atom on" : "atom off");
 }
 
+void CGameContext::ConToggleTrail(IConsole::IResult *pResult, void *pUserData)
+{
+	CGameContext *pSelf = (CGameContext *)pUserData;
+	const int ClientId = pResult->GetVictim();
+	CCharacter *pChr = pSelf->GetPlayerChar(ClientId);
+	if(!pChr)
+		return;
+	pChr->m_Trail = !pChr->m_Trail;
+	if(pChr->m_Trail)
+		new CTrail(&pSelf->m_World, pChr->GetPos(), ClientId);
+	pSelf->Console()->Print(IConsole::OUTPUT_LEVEL_STANDARD, "cosmetics", pChr->m_Trail ? "trail on" : "trail off");
+}
+
+void CGameContext::ConToggleEpicCircle(IConsole::IResult *pResult, void *pUserData)
+{
+	CGameContext *pSelf = (CGameContext *)pUserData;
+	const int ClientId = pResult->GetVictim();
+	CCharacter *pChr = pSelf->GetPlayerChar(ClientId);
+	if(!pChr)
+		return;
+	pChr->m_EpicCircle = !pChr->m_EpicCircle;
+	if(pChr->m_EpicCircle)
+		new CEpicCircle(&pSelf->m_World, pChr->GetPos(), ClientId);
+	pSelf->Console()->Print(IConsole::OUTPUT_LEVEL_STANDARD, "cosmetics", pChr->m_EpicCircle ? "epic_circle on" : "epic_circle off");
+}
+
 void CGameContext::RegisterFddraceAccountCommands()
 {
 	Console()->Register("register", "s[name] s[password] s[password]", CFGFLAG_CHAT | CFGFLAG_SERVER, ConRegister, this, "Register an account");
@@ -205,6 +233,8 @@ void CGameContext::RegisterFddraceAccountCommands()
 	Console()->Register("spawn_flyingpoint", "v[from] i[to]", CFGFLAG_SERVER, ConSpawnFlyingPoint, this, "Spawn flying point from player to target id");
 	Console()->Register("toggle_rotating_ball", "v[id]", CFGFLAG_SERVER, ConToggleRotatingBall, this, "Toggle rotating ball cosmetic");
 	Console()->Register("toggle_atom", "v[id]", CFGFLAG_SERVER, ConToggleAtom, this, "Toggle atom cosmetic");
+	Console()->Register("toggle_trail", "v[id]", CFGFLAG_SERVER, ConToggleTrail, this, "Toggle trail cosmetic");
+	Console()->Register("toggle_epic_circle", "v[id]", CFGFLAG_SERVER, ConToggleEpicCircle, this, "Toggle epic circle cosmetic");
 }
 
 #endif
