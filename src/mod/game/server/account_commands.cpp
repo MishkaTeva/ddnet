@@ -6,7 +6,9 @@
 #include <game/server/gamecontext.h>
 #include <game/server/player.h>
 
+#include <mod/game/server/entities/atom.h>
 #include <mod/game/server/entities/lovely.h>
+#include <mod/game/server/entities/rotating_ball.h>
 #include <mod/game/server/entities/staff_ind.h>
 
 #ifdef CONF_FDDRACE_MOD
@@ -160,6 +162,32 @@ void CGameContext::ConSpawnFlyingPoint(IConsole::IResult *pResult, void *pUserDa
 	pSelf->CreateFlyingPoint(pFrom->GetPos(), ToId, FromId, vec2(0, -5));
 }
 
+void CGameContext::ConToggleRotatingBall(IConsole::IResult *pResult, void *pUserData)
+{
+	CGameContext *pSelf = (CGameContext *)pUserData;
+	const int ClientId = pResult->GetVictim();
+	CCharacter *pChr = pSelf->GetPlayerChar(ClientId);
+	if(!pChr)
+		return;
+	pChr->m_RotatingBall = !pChr->m_RotatingBall;
+	if(pChr->m_RotatingBall)
+		new CRotatingBall(&pSelf->m_World, pChr->GetPos(), ClientId);
+	pSelf->Console()->Print(IConsole::OUTPUT_LEVEL_STANDARD, "cosmetics", pChr->m_RotatingBall ? "rotating_ball on" : "rotating_ball off");
+}
+
+void CGameContext::ConToggleAtom(IConsole::IResult *pResult, void *pUserData)
+{
+	CGameContext *pSelf = (CGameContext *)pUserData;
+	const int ClientId = pResult->GetVictim();
+	CCharacter *pChr = pSelf->GetPlayerChar(ClientId);
+	if(!pChr)
+		return;
+	pChr->m_Atom = !pChr->m_Atom;
+	if(pChr->m_Atom)
+		new CAtom(&pSelf->m_World, pChr->GetPos(), ClientId);
+	pSelf->Console()->Print(IConsole::OUTPUT_LEVEL_STANDARD, "cosmetics", pChr->m_Atom ? "atom on" : "atom off");
+}
+
 void CGameContext::RegisterFddraceAccountCommands()
 {
 	Console()->Register("register", "s[name] s[password] s[password]", CFGFLAG_CHAT | CFGFLAG_SERVER, ConRegister, this, "Register an account");
@@ -175,6 +203,8 @@ void CGameContext::RegisterFddraceAccountCommands()
 	Console()->Register("toggle_lovely", "v[id]", CFGFLAG_SERVER, ConToggleLovely, this, "Toggle lovely hearts cosmetic");
 	Console()->Register("toggle_staff_ind", "v[id]", CFGFLAG_SERVER, ConToggleStaffInd, this, "Toggle staff indicator cosmetic");
 	Console()->Register("spawn_flyingpoint", "v[from] i[to]", CFGFLAG_SERVER, ConSpawnFlyingPoint, this, "Spawn flying point from player to target id");
+	Console()->Register("toggle_rotating_ball", "v[id]", CFGFLAG_SERVER, ConToggleRotatingBall, this, "Toggle rotating ball cosmetic");
+	Console()->Register("toggle_atom", "v[id]", CFGFLAG_SERVER, ConToggleAtom, this, "Toggle atom cosmetic");
 }
 
 #endif

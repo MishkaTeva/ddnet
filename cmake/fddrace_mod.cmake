@@ -29,6 +29,10 @@ set(FDDRACE_MOD_GAME_SRC
   src/mod/game/server/entities/lovely.h
   src/mod/game/server/entities/staff_ind.cpp
   src/mod/game/server/entities/staff_ind.h
+  src/mod/game/server/entities/rotating_ball.cpp
+  src/mod/game/server/entities/rotating_ball.h
+  src/mod/game/server/entities/atom.cpp
+  src/mod/game/server/entities/atom.h
 )
 
 set(FDDRACE_MOD_SRC

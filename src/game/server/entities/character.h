@@ -294,6 +294,8 @@ public:
 #ifdef CONF_FDDRACE_MOD
 	bool m_Lovely = false;
 	bool m_StaffInd = false;
+	bool m_RotatingBall = false;
+	bool m_Atom = false;
 #endif
 };
 

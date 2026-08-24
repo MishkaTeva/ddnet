@@ -379,6 +379,8 @@ public:
 	static void ConToggleLovely(IConsole::IResult *pResult, void *pUserData);
 	static void ConToggleStaffInd(IConsole::IResult *pResult, void *pUserData);
 	static void ConSpawnFlyingPoint(IConsole::IResult *pResult, void *pUserData);
+	static void ConToggleRotatingBall(IConsole::IResult *pResult, void *pUserData);
+	static void ConToggleAtom(IConsole::IResult *pResult, void *pUserData);
 #endif
 	void RegisterDDRaceCommands();
 	void RegisterChatCommands();
