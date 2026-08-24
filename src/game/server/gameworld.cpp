@@ -47,7 +47,7 @@ void CGameWorld::SetGameServer(CGameContext *pGameServer)
 
 void CGameWorld::Init(CCollision *pCollision, CTuningParams *pTuningList)
 {
-	m_Core.InitSwitchers(pCollision->m_HighestSwitchNumber);
+	m_Core.InitSwitchers(pCollision->HighestSwitcherId());
 	m_pTuningList = pTuningList;
 }
 

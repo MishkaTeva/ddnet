@@ -111,6 +111,7 @@ option(AUTOUPDATE "Enable the autoupdater" OFF)
 option(INFORM_UPDATE "Inform about available updates" ON)
 option(VIDEORECORDER "Enable video recording support via FFmpeg" ON)
 option(UPNP "Enable UPnP support" OFF)
+option(FDDRACE_MOD "Build F-DDrace mod server layer (DDNet base + mod gameplay)" ON)
 option(ANTIBOT "Enable support for a dynamic anticheat library (not provided, see src/antibot for interface if you want to implement your own)" OFF)
 option(HEADLESS_CLIENT "Build the client without graphics" OFF)
 option(CLIENT "Compile client" ON)
@@ -193,6 +194,14 @@ endif()
 
 set(SERVER_EXECUTABLE DDNet-Server CACHE STRING "Name of the built server executable")
 set(CLIENT_EXECUTABLE DDNet CACHE STRING "Name of the build client executable")
+if(FDDRACE_MOD)
+  set(SERVER_EXECUTABLE M-DDrace-Server CACHE STRING "Name of the built server executable" FORCE)
+  set(CLIENT OFF CACHE BOOL "Compile client" FORCE)
+  set(TOOLS OFF CACHE BOOL "Compile tools" FORCE)
+  set(SERVER ON CACHE BOOL "Compile server" FORCE)
+  set(PREFER_BUNDLED_LIBS ON CACHE BOOL "Prefer bundled libraries over system libraries" FORCE)
+  include(${CMAKE_CURRENT_SOURCE_DIR}/cmake/fddrace_mod.cmake)
+endif()
 
 ########################################################################
 # Compiler flags
@@ -2414,6 +2423,10 @@ add_library(game-shared EXCLUDE_FROM_ALL OBJECT ${GAME_SHARED} ${GAME_GENERATED_
 add_dependencies(engine-shared generate_protocol)
 add_dependencies(game-shared generate_protocol)
 # tidy-alphabetical-end
+if(FDDRACE_MOD)
+  # collision/mapitems/gamecore live in game-shared; mod tile hooks need the same define as the server.
+  target_compile_definitions(game-shared PRIVATE CONF_FDDRACE_MOD)
+endif()
 list(APPEND TARGETS_OWN engine-gfx engine-shared game-shared)
 
 if(DISCORD AND NOT DISCORD_DYNAMIC)
@@ -3103,6 +3116,9 @@ if(SERVER)
       PROPERTY OUTPUT_NAME ${SERVER_EXECUTABLE}
   )
   target_link_libraries(game-server-without-main ${LIBS_SERVER})
+  if(FDDRACE_MOD)
+    apply_fddrace_mod(game-server-without-main)
+  endif()
   list(APPEND TARGETS_OWN game-server-without-main)
   list(APPEND TARGETS_LINK game-server-without-main)
 
@@ -3138,6 +3154,22 @@ if(SERVER)
       PROPERTY OUTPUT_NAME ${SERVER_EXECUTABLE}
   )
   target_link_libraries(game-server ${LIBS_SERVER})
+  if(FDDRACE_MOD)
+    add_custom_command(TARGET game-server POST_BUILD
+      COMMAND ${CMAKE_COMMAND} -E copy_if_different
+        "${PROJECT_SOURCE_DIR}/discord_bot.py"
+        "$<TARGET_FILE_DIR:game-server>/discord_bot.py"
+      COMMENT "Copy discord_bot.py to server output directory"
+    )
+    if(EXISTS "${PROJECT_SOURCE_DIR}/discord_bot.token")
+      add_custom_command(TARGET game-server POST_BUILD
+        COMMAND ${CMAKE_COMMAND} -E copy_if_different
+          "${PROJECT_SOURCE_DIR}/discord_bot.token"
+          "$<TARGET_FILE_DIR:game-server>/discord_bot.token"
+        COMMENT "Copy discord_bot.token to server output directory"
+      )
+    endif()
+  endif()
   list(APPEND TARGETS_OWN game-server)
   list(APPEND TARGETS_LINK game-server)
 

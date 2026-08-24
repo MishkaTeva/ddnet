@@ -47,11 +47,13 @@ public:
 	{
 #define MACRO_TUNING_PARAM(Name, ScriptName, Value, Description) m_##Name = (Value);
 #include "tuning.h"
+#include "tuning_mod.h"
 #undef MACRO_TUNING_PARAM
 	}
 
 #define MACRO_TUNING_PARAM(Name, ScriptName, Value, Description) CTuneParam m_##Name;
 #include "tuning.h"
+#include "tuning_mod.h"
 #undef MACRO_TUNING_PARAM
 
 	static int Num()

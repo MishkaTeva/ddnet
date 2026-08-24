@@ -8,6 +8,10 @@
 #include "name_ban.h"
 #include "snap_id_pool.h"
 
+#ifdef CONF_FDDRACE_MOD
+#include <mod/engine/server/anticheat.h>
+#endif
+
 #include <base/hash.h>
 
 #include <engine/console.h>
@@ -212,6 +216,13 @@ public:
 
 		bool m_Sixup;
 
+#ifdef CONF_FDDRACE_MOD
+		bool m_SentIamTater;
+		bool m_TClientVerified;
+		bool m_HasHardcodedHash;
+		char m_aIamTaterStr[128];
+#endif
+
 		bool IncludedInServerInfo() const
 		{
 			return m_State != STATE_EMPTY && !m_DebugDummy;
@@ -287,6 +298,11 @@ public:
 
 	std::shared_ptr<ILogger> m_pFileLogger = nullptr;
 	std::shared_ptr<ILogger> m_pStdoutLogger = nullptr;
+
+#ifdef CONF_FDDRACE_MOD
+	class CDiscordBridge *m_pDiscordBridge = nullptr;
+	CAntiCheat m_AntiCheat;
+#endif
 
 	CServer();
 	~CServer() override;
@@ -540,6 +556,43 @@ public:
 	void SetErrorShutdown(const char *pReason) override;
 
 	bool IsSixup(int ClientId) const override { return ClientId != SERVER_DEMO_CLIENT && m_aClients[ClientId].m_Sixup; }
+#ifdef CONF_FDDRACE_MOD
+	void SetDiscordBridge(class CDiscordBridge *pBridge) { m_pDiscordBridge = pBridge; }
+	class CDiscordBridge *DiscordBridge() { return m_pDiscordBridge; }
+	CAntiCheat *AntiCheat() override { return &m_AntiCheat; }
+	const char *GetClientVersionStr(int ClientId) const override;
+	const char *GetClientNetVersion(int ClientId) const override;
+	const char *GetAuthIdent(int ClientId) const override;
+	void GetClientAddrStr(int ClientId, char *pAddrStr, int Size, bool IncludePort) const override;
+	void SendWebhookMessage(const char *pUrl, const char *pMessage, const char *pUsername = "", const char *pAvatarUrl = "") override;
+	const char *GetClientIamTaterStr(int ClientId) const override;
+	bool IsClientTClientVerified(int ClientId) const override;
+	bool IsClientHardcodedHash(int ClientId) const override;
+	bool IsOldClient(int ClientId) const override;
+#else
+	CAntiCheat *AntiCheat() override { return nullptr; }
+	const char *GetClientVersionStr(int ClientId) const override { (void)ClientId; return ""; }
+	const char *GetClientNetVersion(int ClientId) const override { (void)ClientId; return ""; }
+	const char *GetAuthIdent(int ClientId) const override { (void)ClientId; return ""; }
+	void GetClientAddrStr(int ClientId, char *pAddrStr, int Size, bool IncludePort) const override
+	{
+		(void)ClientId;
+		(void)IncludePort;
+		if(pAddrStr && Size > 0)
+			pAddrStr[0] = 0;
+	}
+	void SendWebhookMessage(const char *pUrl, const char *pMessage, const char *pUsername = "", const char *pAvatarUrl = "") override
+	{
+		(void)pUrl;
+		(void)pMessage;
+		(void)pUsername;
+		(void)pAvatarUrl;
+	}
+	const char *GetClientIamTaterStr(int ClientId) const override { (void)ClientId; return ""; }
+	bool IsClientTClientVerified(int ClientId) const override { (void)ClientId; return false; }
+	bool IsClientHardcodedHash(int ClientId) const override { (void)ClientId; return false; }
+	bool IsOldClient(int ClientId) const override { (void)ClientId; return false; }
+#endif
 	int GetMaxClients(int ClientId) const override;
 	bool ClientSupportsServerMaxClients(int ClientId) const override;
 

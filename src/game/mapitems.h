@@ -711,4 +711,6 @@ bool IsCreditsTile(int TileIndex);
 int PackColor(const CColor &Color);
 CColor UnpackColor(int PackedColor);
 
+#include "mapitems_mod.h"
+
 #endif

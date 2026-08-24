@@ -7,6 +7,9 @@
 
 #include <engine/antibot.h>
 #include <engine/shared/config.h>
+#ifdef CONF_FDDRACE_MOD
+#include <engine/shared/uuid_manager.h>
+#endif
 
 #include <game/mapitems.h>
 #include <game/server/entities/character.h>
@@ -14,6 +17,8 @@
 #include <game/server/player.h>
 #include <game/server/save.h>
 #include <game/server/teams.h>
+
+#include <algorithm>
 
 void CGameContext::ConGoLeft(IConsole::IResult *pResult, void *pUserData)
 {
@@ -692,3 +697,135 @@ void CGameContext::LogEvent(const char *Description, int ClientId)
 		str_copy(pNewEntry->m_aClientName, Server()->ClientName(ClientId));
 	}
 }
+
+#ifdef CONF_FDDRACE_MOD
+static void ParseClientVersionParts(const char *pVersionStr, char *pClientName, int ClientNameSize, char *pClientHash, int ClientHashSize)
+{
+	str_copy(pClientName, "Unknown", ClientNameSize);
+	str_copy(pClientHash, "None", ClientHashSize);
+	if(!pVersionStr || !pVersionStr[0] || str_comp(pVersionStr, "Unknown") == 0)
+		return;
+
+	const char *pHashStart = str_find(pVersionStr, "(");
+	if(!pHashStart)
+	{
+		str_copy(pClientName, pVersionStr, ClientNameSize);
+		return;
+	}
+
+	pHashStart++;
+	const char *pHashEnd = str_find(pHashStart, ")");
+	if(pHashEnd)
+	{
+		const int HashLen = (int)(pHashEnd - pHashStart);
+		str_copy(pClientHash, pHashStart, std::min(HashLen + 1, ClientHashSize));
+	}
+
+	const int NameLen = (int)((pHashStart - 1) - pVersionStr);
+	if(NameLen > 0)
+	{
+		str_copy(pClientName, pVersionStr, std::min(NameLen + 1, ClientNameSize));
+		const int Len = str_length(pClientName);
+		if(Len > 0 && pClientName[Len - 1] == ' ')
+			pClientName[Len - 1] = '\0';
+	}
+}
+
+void CGameContext::ConClientInfo(IConsole::IResult *pResult, void *pUserData)
+{
+	CGameContext *pSelf = (CGameContext *)pUserData;
+
+	if(pResult->NumArguments() == 0)
+	{
+		pSelf->Console()->Print(IConsole::OUTPUT_LEVEL_STANDARD, "clientinfo", "=== Client Info for All Players ===");
+		int PlayerCount = 0;
+		for(int i = 0; i < MAX_CLIENTS; i++)
+		{
+			if(!pSelf->m_apPlayers[i] || !pSelf->Server()->ClientIngame(i))
+				continue;
+
+			IServer::CClientInfo Info;
+			if(!pSelf->Server()->GetClientInfo(i, &Info))
+				continue;
+
+			PlayerCount++;
+			char aClientName[128];
+			char aClientHash[64];
+			const char *pVersionStr = Info.m_pDDNetVersionStr ? Info.m_pDDNetVersionStr : "Unknown";
+			ParseClientVersionParts(pVersionStr, aClientName, sizeof(aClientName), aClientHash, sizeof(aClientHash));
+
+			char aInfoBuffer[512];
+			str_format(aInfoBuffer, sizeof(aInfoBuffer), "[%d] %s | Client = %s | Hash = %s",
+				i, Info.m_pName, aClientName, aClientHash);
+			pSelf->Console()->Print(IConsole::OUTPUT_LEVEL_STANDARD, "clientinfo", aInfoBuffer);
+		}
+
+		if(PlayerCount == 0)
+			pSelf->Console()->Print(IConsole::OUTPUT_LEVEL_STANDARD, "clientinfo", "No players online");
+		else
+		{
+			char aBuf[128];
+			str_format(aBuf, sizeof(aBuf), "=== Total: %d player(s) ===", PlayerCount);
+			pSelf->Console()->Print(IConsole::OUTPUT_LEVEL_STANDARD, "clientinfo", aBuf);
+		}
+		return;
+	}
+
+	const int ClientId = pResult->GetInteger(0);
+	if(ClientId < 0 || ClientId >= MAX_CLIENTS || !pSelf->m_apPlayers[ClientId])
+	{
+		char aBuf[256];
+		str_format(aBuf, sizeof(aBuf), "Player ID %d not found", ClientId);
+		pSelf->Console()->Print(IConsole::OUTPUT_LEVEL_STANDARD, "clientinfo", aBuf);
+		return;
+	}
+
+	IServer::CClientInfo Info;
+	if(!pSelf->Server()->GetClientInfo(ClientId, &Info))
+	{
+		char aBuf[256];
+		str_format(aBuf, sizeof(aBuf), "Failed to get client info for ID %d", ClientId);
+		pSelf->Console()->Print(IConsole::OUTPUT_LEVEL_STANDARD, "clientinfo", aBuf);
+		return;
+	}
+
+	char aUuidStr[UUID_MAXSTRSIZE] = "None";
+	bool HasValidUuid = false;
+	if(Info.m_pConnectionId)
+	{
+		FormatUuid(*Info.m_pConnectionId, aUuidStr, sizeof(aUuidStr));
+		for(unsigned char Byte : Info.m_pConnectionId->m_aData)
+		{
+			if(Byte != 0)
+			{
+				HasValidUuid = true;
+				break;
+			}
+		}
+	}
+
+	const char *pVersionStr = Info.m_pDDNetVersionStr ? Info.m_pDDNetVersionStr : "Unknown";
+	const int Version = Info.m_GotDDNetVersion ? Info.m_DDNetVersion : -1;
+	char aClientName[128];
+	char aClientHash[64];
+	ParseClientVersionParts(pVersionStr, aClientName, sizeof(aClientName), aClientHash, sizeof(aClientHash));
+
+	char aInfoBuffer[1024];
+	str_format(aInfoBuffer, sizeof(aInfoBuffer),
+		"Client Info for '%s' (ID=%d):\n"
+		"  DDNet Version: %s (code: %d)\n"
+		"  Client: %s\n"
+		"  Client Hash: %s\n"
+		"  Connection UUID: %s\n"
+		"  Has Valid UUID: %s\n"
+		"  Latency: %d",
+		Info.m_pName, ClientId,
+		pVersionStr, Version,
+		aClientName,
+		aClientHash,
+		aUuidStr,
+		HasValidUuid ? "Yes" : "No",
+		Info.m_Latency);
+	pSelf->Console()->Print(IConsole::OUTPUT_LEVEL_STANDARD, "clientinfo", aInfoBuffer);
+}
+#endif

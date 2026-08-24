@@ -96,6 +96,8 @@ enum
 	CFGFLAG_COLALPHA = 1 << 12,
 	CFGFLAG_INSENSITIVE = 1 << 13,
 	CMDFLAG_PRACTICE = 1 << 14,
+	// F-DDrace: do not auto-convert VICTIM_ME to the executing ClientId (bit unused by upstream DDNet).
+	CFGFLAG_RAWVICTIM = 1 << 15,
 };
 
 #ifdef CONF_DEBUG

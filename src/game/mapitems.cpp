@@ -31,6 +31,9 @@ bool IsValidGameTile(int Index)
 		(Index >= TILE_TELE_LASER_ENABLE && Index <= TILE_TELE_LASER_DISABLE) ||
 		(Index >= TILE_NPC_ENABLE && Index <= TILE_NPH_ENABLE) ||
 		(Index >= TILE_ENTITIES_OFF_1 && Index <= TILE_ENTITIES_OFF_2) ||
+#ifdef CONF_FDDRACE_MOD
+		IsFddraceModGameTile(Index) ||
+#endif
 		IsValidEntity(Index));
 }
 
@@ -53,6 +56,9 @@ bool IsValidFrontTile(int Index)
 		(Index >= TILE_TELE_LASER_ENABLE && Index <= TILE_TELE_LASER_DISABLE) ||
 		(Index >= TILE_NPC_ENABLE && Index <= TILE_NPH_ENABLE) ||
 		(Index >= TILE_ENTITIES_OFF_1 && Index <= TILE_ENTITIES_OFF_2) ||
+#ifdef CONF_FDDRACE_MOD
+		IsFddraceModGameTile(Index) ||
+#endif
 		IsValidEntity(Index));
 }
 
@@ -110,6 +116,13 @@ bool IsValidSwitchTile(int Index)
 		Index == TILE_SUBTRACT_TIME ||
 		Index == TILE_ALLOW_TELE_GUN ||
 		Index == TILE_ALLOW_BLUE_TELE_GUN ||
+#ifdef CONF_FDDRACE_MOD
+		Index == TILE_SWITCH_PLOT ||
+		Index == TILE_SWITCH_PLOT_DOOR ||
+		Index == TILE_SWITCH_PLOT_TOTELE ||
+		Index == TILE_SWITCH_REDIRECT_SERVER_FROM ||
+		Index == TILE_SWITCH_REDIRECT_SERVER_TO ||
+#endif
 		(IsValidEntity(Index) && Index >= ENTITY_OFFSET + ENTITY_ARMOR_1));
 }
 
@@ -132,7 +145,11 @@ bool IsSwitchTileNumberUsed(int Index)
 bool IsSwitchTileDelayUsed(int Index)
 {
 	return Index != TILE_DFREEZE &&
-	       Index != TILE_DUNFREEZE;
+	       Index != TILE_DUNFREEZE
+#ifdef CONF_FDDRACE_MOD
+	       && Index != TILE_SWITCH_PLOT
+#endif
+		;
 }
 
 bool IsValidTuneTile(int Index)

@@ -6,6 +6,9 @@
 #include "databases/connection.h"
 #include "databases/connection_pool.h"
 #include "register.h"
+#ifdef CONF_FDDRACE_MOD
+#include <mod/engine/server/mod_server_integration.h>
+#endif
 
 #include <base/bytes.h>
 #include <base/fs.h>
@@ -239,6 +242,12 @@ void CServer::CClient::Reset()
 
 	std::fill(std::begin(m_aIdMap), std::end(m_aIdMap), -1);
 	std::fill(std::begin(m_aReverseIdMap), std::end(m_aReverseIdMap), -1);
+#ifdef CONF_FDDRACE_MOD
+	m_SentIamTater = false;
+	m_TClientVerified = false;
+	m_HasHardcodedHash = false;
+	m_aIamTaterStr[0] = 0;
+#endif
 }
 
 CServer::CServer()
@@ -300,6 +309,10 @@ CServer::~CServer()
 		}
 	}
 	free(m_pPersistentData);
+
+#ifdef CONF_FDDRACE_MOD
+	ModServerShutdown(this);
+#endif
 
 	delete m_pRegister;
 	delete m_pConnectionPool;
@@ -3312,6 +3325,10 @@ int CServer::Run()
 	Console()->Print(IConsole::OUTPUT_LEVEL_STANDARD, "server", aBuf);
 
 	Antibot()->Init();
+#ifdef CONF_FDDRACE_MOD
+	m_AntiCheat.Init(this, Storage());
+	ModServerInit(this);
+#endif
 	GameServer()->OnInit(nullptr);
 	if(ErrorShutdown())
 	{
@@ -3477,6 +3494,9 @@ int CServer::Run()
 				}
 
 				GameServer()->OnTick();
+#ifdef CONF_FDDRACE_MOD
+				m_AntiCheat.Tick();
+#endif
 				if(ErrorShutdown())
 				{
 					break;
@@ -4829,3 +4849,70 @@ void CServer::SetLoggers(std::shared_ptr<ILogger> &&pFileLogger, std::shared_ptr
 	m_pFileLogger = pFileLogger;
 	m_pStdoutLogger = pStdoutLogger;
 }
+
+#ifdef CONF_FDDRACE_MOD
+const char *CServer::GetClientVersionStr(int ClientId) const
+{
+	if(ClientId < 0 || ClientId >= MAX_CLIENTS)
+		return "";
+	if(m_aClients[ClientId].m_aDDNetVersionStr[0])
+		return m_aClients[ClientId].m_aDDNetVersionStr;
+	return "";
+}
+
+const char *CServer::GetClientNetVersion(int ClientId) const
+{
+	return GetClientVersionStr(ClientId);
+}
+
+const char *CServer::GetAuthIdent(int ClientId) const
+{
+	if(ClientId < 0 || ClientId >= MAX_CLIENTS)
+		return "";
+	return m_AuthManager.KeyIdent(m_aClients[ClientId].m_AuthKey);
+}
+
+void CServer::GetClientAddrStr(int ClientId, char *pAddrStr, int Size, bool IncludePort) const
+{
+	if(!pAddrStr || Size <= 0)
+		return;
+	str_copy(pAddrStr, ClientAddrString(ClientId, IncludePort), Size);
+}
+
+void CServer::SendWebhookMessage(const char *pUrl, const char *pMessage, const char *pUsername, const char *pAvatarUrl)
+{
+	(void)pAvatarUrl;
+	if(!pUrl || !pUrl[0] || !pMessage || !pMessage[0])
+		return;
+	dbg_msg("webhook", "[%s] %s", pUsername ? pUsername : "webhook", pMessage);
+	dbg_msg("webhook", "url=%s", pUrl);
+}
+
+const char *CServer::GetClientIamTaterStr(int ClientId) const
+{
+	if(ClientId < 0 || ClientId >= MAX_CLIENTS)
+		return "";
+	return m_aClients[ClientId].m_aIamTaterStr;
+}
+
+bool CServer::IsClientTClientVerified(int ClientId) const
+{
+	if(ClientId < 0 || ClientId >= MAX_CLIENTS)
+		return false;
+	return m_aClients[ClientId].m_TClientVerified;
+}
+
+bool CServer::IsClientHardcodedHash(int ClientId) const
+{
+	if(ClientId < 0 || ClientId >= MAX_CLIENTS)
+		return false;
+	return m_aClients[ClientId].m_HasHardcodedHash;
+}
+
+bool CServer::IsOldClient(int ClientId) const
+{
+	if(ClientId < 0 || ClientId >= MAX_CLIENTS)
+		return false;
+	return m_aClients[ClientId].m_Sixup && !m_aClients[ClientId].m_GotDDNetVersionPacket;
+}
+#endif

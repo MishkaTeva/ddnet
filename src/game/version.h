@@ -3,9 +3,14 @@
 #ifndef GAME_VERSION_H
 #define GAME_VERSION_H
 
-// ddnet
+// ddnet / F-DDrace mod
+#ifdef CONF_FDDRACE_MOD
+#define GAME_NAME "M-DDrace"
+#define DDNET_VERSION_NUMBER 20010
+#else
 #define GAME_NAME "DDNet"
 #define DDNET_VERSION_NUMBER 20010
+#endif
 extern const char *GIT_SHORTREV_HASH;
 #ifndef GAME_RELEASE_VERSION_INTERNAL
 #define GAME_RELEASE_VERSION_INTERNAL 20.1

@@ -123,6 +123,17 @@ public:
 
 	int m_HighestSwitchNumber;
 
+	// Includes remapped F-DDrace plot switch IDs when CONF_FDDRACE_MOD is on.
+	int HighestSwitcherId() const;
+
+#ifdef CONF_FDDRACE_MOD
+	static bool IsPlotTile(int Index);
+	int NumPlots() const { return m_NumPlots; }
+	int GetSwitchByPlot(int PlotId) const;
+	int GetPlotBySwitch(int SwitchId) const;
+	bool IsPlotDoor(int SwitchId) const;
+#endif
+
 	/**
 	 * Index all teleporter types (in, out and checkpoints)
 	 * as one consecutive list.
@@ -159,6 +170,10 @@ private:
 	CSwitchTile *m_pSwitch;
 	CTuneTile *m_pTune;
 	CDoorTile *m_pDoor;
+
+#ifdef CONF_FDDRACE_MOD
+	int m_NumPlots = 0;
+#endif
 
 	// TILE_TELEIN
 	std::map<int, std::vector<vec2>> m_TeleIns;

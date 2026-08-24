@@ -14,6 +14,7 @@
 #include <game/layers.h>
 #include <game/mapitems.h>
 
+#include <algorithm>
 #include <cmath>
 
 vec2 ClampVel(int MoveRestriction, vec2 Vel)
@@ -89,10 +90,23 @@ void CCollision::Init(class CLayers *pLayers)
 	{
 		for(int i = 0; i < m_Width * m_Height; i++)
 		{
+#ifdef CONF_FDDRACE_MOD
+			const int SwitchType = m_pSwitch[i].m_Type;
+			if(IsPlotTile(SwitchType))
+			{
+				if(m_pSwitch[i].m_Number > m_NumPlots)
+					m_NumPlots = m_pSwitch[i].m_Number;
+			}
+			else if(m_pSwitch[i].m_Number > m_HighestSwitchNumber)
+			{
+				m_HighestSwitchNumber = m_pSwitch[i].m_Number;
+			}
+#else
 			if(m_pSwitch[i].m_Number > m_HighestSwitchNumber)
 			{
 				m_HighestSwitchNumber = m_pSwitch[i].m_Number;
 			}
+#endif
 
 			m_pDoor[i].m_Number = m_pSwitch[i].m_Number;
 
@@ -111,6 +125,35 @@ void CCollision::Init(class CLayers *pLayers)
 				}
 			}
 		}
+
+#ifdef CONF_FDDRACE_MOD
+		if(m_NumPlots >= MAX_PLOTS)
+			m_NumPlots = MAX_PLOTS - 1;
+		// Switcher/door numbers are stored in unsigned char (max 255).
+		if(m_HighestSwitchNumber + m_NumPlots > 255)
+			m_NumPlots = std::max(0, 255 - m_HighestSwitchNumber);
+
+		// Remap plot switch numbers above normal DDNet switches (F-DDrace layout).
+		for(int i = 0; i < m_Width * m_Height; i++)
+		{
+			if(!IsPlotTile(m_pSwitch[i].m_Type) || m_pSwitch[i].m_Number <= 0)
+				continue;
+
+			const int PlotId = m_pSwitch[i].m_Number;
+			m_pSwitch[i].m_Number = GetSwitchByPlot(PlotId);
+			m_pDoor[i].m_Number = m_pSwitch[i].m_Number;
+
+			// Plot doors act as laser doors (closed while their switcher is on).
+			if(m_pSwitch[i].m_Type == TILE_SWITCH_PLOT_DOOR)
+			{
+				m_pDoor[i].m_Index = TILE_STOPA;
+				m_pDoor[i].m_Flags = 0;
+			}
+		}
+
+		if(m_NumPlots > 0)
+			dbg_msg("collision", "F-DDrace plots detected: %d (highest normal switch=%d, switchers=%d)", m_NumPlots, m_HighestSwitchNumber, HighestSwitcherId());
+#endif
 	}
 
 	if(m_pTele)
@@ -153,6 +196,10 @@ void CCollision::Unload()
 	m_pLayers = nullptr;
 
 	m_HighestSwitchNumber = 0;
+
+#ifdef CONF_FDDRACE_MOD
+	m_NumPlots = 0;
+#endif
 
 	m_TeleIns.clear();
 	m_TeleOuts.clear();
@@ -298,7 +345,8 @@ int CCollision::GetMoveRestrictions(CALLBACK_SWITCHACTIVE pfnSwitchActive, void 
 		{
 			CDoorTile DoorTile;
 			GetDoorTile(ModMapIndex, &DoorTile);
-			if((int)DoorTile.m_Number <= m_HighestSwitchNumber &&
+			if((int)DoorTile.m_Number <= HighestSwitcherId() &&
+				DoorTile.m_Number < 256 &&
 				pfnSwitchActive(DoorTile.m_Number, pUser))
 			{
 				Restrictions |= ::GetMoveRestrictions(d, DoorTile.m_Index, DoorTile.m_Flags);
@@ -771,7 +819,7 @@ int CCollision::GetSwitchNumber(int Index) const
 	if(Index < 0 || !m_pSwitch)
 		return 0;
 
-	if(m_pSwitch[Index].m_Type > 0 && m_pSwitch[Index].m_Number > 0 && m_pSwitch[Index].m_Number <= m_HighestSwitchNumber)
+	if(m_pSwitch[Index].m_Type > 0 && m_pSwitch[Index].m_Number > 0 && m_pSwitch[Index].m_Number <= HighestSwitcherId())
 		return m_pSwitch[Index].m_Number;
 
 	return 0;
@@ -1303,4 +1351,39 @@ size_t CCollision::TeleAllSize(int Number)
 	if(m_TeleOthers.contains(Number))
 		Total += m_TeleOthers[Number].size();
 	return Total;
+}
+
+#ifdef CONF_FDDRACE_MOD
+bool CCollision::IsPlotTile(int Index)
+{
+	return Index == TILE_SWITCH_PLOT || Index == TILE_SWITCH_PLOT_DOOR || Index == TILE_SWITCH_PLOT_TOTELE;
+}
+
+int CCollision::GetSwitchByPlot(int PlotId) const
+{
+	if(PlotId <= 0 || PlotId > m_NumPlots)
+		return 0;
+	return PlotId + m_HighestSwitchNumber;
+}
+
+bool CCollision::IsPlotDoor(int SwitchId) const
+{
+	return SwitchId > m_HighestSwitchNumber && SwitchId <= m_HighestSwitchNumber + m_NumPlots;
+}
+
+int CCollision::GetPlotBySwitch(int SwitchId) const
+{
+	if(!IsPlotDoor(SwitchId))
+		return 0;
+	return SwitchId - m_HighestSwitchNumber;
+}
+#endif
+
+int CCollision::HighestSwitcherId() const
+{
+#ifdef CONF_FDDRACE_MOD
+	return m_HighestSwitchNumber + m_NumPlots;
+#else
+	return m_HighestSwitchNumber;
+#endif
 }

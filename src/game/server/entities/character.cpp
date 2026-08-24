@@ -1598,7 +1598,9 @@ bool CCharacter::IsSwitchActiveCb(unsigned char Number, void *pUser)
 {
 	CCharacter *pThis = (CCharacter *)pUser;
 	auto &aSwitchers = pThis->Switchers();
-	return !aSwitchers.empty() && pThis->Team() != TEAM_SUPER && aSwitchers[Number].m_aStatus[pThis->Team()];
+	if(aSwitchers.empty() || Number >= aSwitchers.size())
+		return false;
+	return pThis->Team() != TEAM_SUPER && aSwitchers[Number].m_aStatus[pThis->Team()];
 }
 
 void CCharacter::SetTimeCheckpoint(int TimeCheckpoint)
@@ -1656,6 +1658,29 @@ void CCharacter::HandleTiles(int Index)
 	GameServer()->m_pController->HandleCharacterTiles(this, Index);
 	if(!m_Alive)
 		return;
+
+#ifdef CONF_FDDRACE_MOD
+	// Staff-only zones work without accounts. VIP/money/jail need later phases.
+	const int Auth = Server()->GetAuthedState(m_pPlayer->GetCid());
+	if((m_TileIndex == TILE_HELPERS_ONLY || m_TileFIndex == TILE_HELPERS_ONLY) && Auth < AUTHED_HELPER)
+	{
+		GameServer()->SendChatTarget(m_pPlayer->GetCid(), "This area is for helpers only");
+		Die(m_pPlayer->GetCid(), WEAPON_WORLD);
+		return;
+	}
+	if((m_TileIndex == TILE_MODERATORS_ONLY || m_TileFIndex == TILE_MODERATORS_ONLY) && Auth < AUTHED_MOD)
+	{
+		GameServer()->SendChatTarget(m_pPlayer->GetCid(), "This area is for moderators only");
+		Die(m_pPlayer->GetCid(), WEAPON_WORLD);
+		return;
+	}
+	if((m_TileIndex == TILE_ADMINS_ONLY || m_TileFIndex == TILE_ADMINS_ONLY) && Auth < AUTHED_ADMIN)
+	{
+		GameServer()->SendChatTarget(m_pPlayer->GetCid(), "This area is for admins only");
+		Die(m_pPlayer->GetCid(), WEAPON_WORLD);
+		return;
+	}
+#endif
 
 	// freeze
 	if(((m_TileIndex == TILE_FREEZE) || (m_TileFIndex == TILE_FREEZE)) && !m_Core.m_Super && !m_Core.m_Invincible && !m_Core.m_DeepFrozen)

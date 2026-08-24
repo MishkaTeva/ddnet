@@ -43,6 +43,18 @@
 #include <game/gamecore.h>
 #include <game/mapitems.h>
 #include <game/version.h>
+#ifdef CONF_FDDRACE_MOD
+#include <mod/game/server/versioncheck.h>
+
+namespace
+{
+struct SFddraceCompatCommandContext
+{
+	CGameContext *m_pGameContext;
+	const char *m_pName;
+};
+}
+#endif
 
 #include <vector>
 
@@ -2039,6 +2051,14 @@ bool CGameContext::OnClientDDNetVersionKnown(int ClientId)
 		return true;
 	}
 
+#ifdef CONF_FDDRACE_MOD
+	if(!CVersionCheck::IsVersionAllowed(ClientVersion, g_Config.m_SvMinClientVersion))
+	{
+		Server()->Kick(ClientId, CVersionCheck::GetKickMessage());
+		return true;
+	}
+#endif
+
 	CPlayer *pPlayer = m_apPlayers[ClientId];
 	if(ClientVersion >= VERSION_DDNET_GAMETICK)
 		pPlayer->m_TimerType = g_Config.m_SvDefaultTimerType;
@@ -3960,6 +3980,9 @@ void CGameContext::OnConsoleInit()
 	Console()->Chain("sv_spectator_slots", ConchainSettingUpdate, this);
 
 	RegisterDDRaceCommands();
+#ifdef CONF_FDDRACE_MOD
+	RegisterFddraceCompatCommands();
+#endif
 	RegisterChatCommands();
 }
 
@@ -4038,6 +4061,323 @@ void CGameContext::RegisterDDRaceCommands()
 
 	Console()->Chain("sv_practice_by_default", ConchainPracticeByDefaultUpdate, this);
 }
+
+#ifdef CONF_FDDRACE_MOD
+void CGameContext::ConFddraceCompatNotImplemented(IConsole::IResult *pResult, void *pUserData)
+{
+	(void)pResult;
+	auto *pContext = static_cast<SFddraceCompatCommandContext *>(pUserData);
+	if(!pContext || !pContext->m_pGameContext)
+		return;
+
+	char aBuf[256];
+	str_format(aBuf, sizeof(aBuf), "Command '%s' is recognized for F-DDrace compatibility, but its gameplay implementation is not ported yet.", pContext->m_pName);
+	pContext->m_pGameContext->Console()->Print(IConsole::OUTPUT_LEVEL_STANDARD, "fddrace", aBuf);
+}
+
+void CGameContext::ConAllWeaponsCompat(IConsole::IResult *pResult, void *pUserData)
+{
+	ConWeapons(pResult, pUserData);
+}
+
+void CGameContext::ConUnAllWeaponsCompat(IConsole::IResult *pResult, void *pUserData)
+{
+	ConUnWeapons(pResult, pUserData);
+}
+
+void CGameContext::RegisterFddraceCompatCommands()
+{
+	// Implemented now (F-DDrace behavior): no args = all players; arg = player ID.
+	Console()->Register("client_info", "?i[id]", CFGFLAG_SERVER, ConClientInfo, this, "Show client info for all players, or for player i by ID");
+
+	// Overlapping DDNet commands: keep DDNet handlers; F-DDrace aliases where params/name differ.
+	Console()->Register("allweapons", "?v[id] ?i[spread]", CFGFLAG_SERVER | CMDFLAG_TEST, ConAllWeaponsCompat, this, "Compatibility alias for F-DDrace allweapons");
+	Console()->Register("unallweapons", "?v[id]", CFGFLAG_SERVER | CMDFLAG_TEST, ConUnAllWeaponsCompat, this, "Compatibility alias for F-DDrace unallweapons");
+
+	// Unique F-DDrace RCON names (stubs until gameplay/entities/accounts are ported).
+	static SFddraceCompatCommandContext s_aCompatCommands[] = {
+		{nullptr, "status_recently_left"},
+		{nullptr, "extraweapons"},
+		{nullptr, "unextraweapons"},
+		{nullptr, "plasmarifle"},
+		{nullptr, "unplasmarifle"},
+		{nullptr, "heartgun"},
+		{nullptr, "unheartgun"},
+		{nullptr, "straightgrenade"},
+		{nullptr, "unstraightgrenade"},
+		{nullptr, "telekinesis"},
+		{nullptr, "untelekinesis"},
+		{nullptr, "lightsaber"},
+		{nullptr, "unlightsaber"},
+		{nullptr, "portalrifle"},
+		{nullptr, "unportalrifle"},
+		{nullptr, "projectilerifle"},
+		{nullptr, "unprojectilerifle"},
+		{nullptr, "ballgrenade"},
+		{nullptr, "unballgrenade"},
+		{nullptr, "telerifle"},
+		{nullptr, "untelerifle"},
+		{nullptr, "taser"},
+		{nullptr, "untaser"},
+		{nullptr, "lightninglaser"},
+		{nullptr, "unlightninglaser"},
+		{nullptr, "hammer"},
+		{nullptr, "gun"},
+		{nullptr, "unhammer"},
+		{nullptr, "ungun"},
+		{nullptr, "draweditor"},
+		{nullptr, "undraweditor"},
+		{nullptr, "scrollninja"},
+		{nullptr, "connectdummy"},
+		{nullptr, "disconnectdummy"},
+		{nullptr, "dummymode"},
+		{nullptr, "connectdefaultdummies"},
+		{nullptr, "punchbag"},
+		{nullptr, "tune_lock_pl"},
+		{nullptr, "tune_lock_pl_reset"},
+		{nullptr, "tune_lock_pl_dump"},
+		{nullptr, "forceflagowner"},
+		{nullptr, "say_by"},
+		{nullptr, "teecontrol"},
+		{nullptr, "set_minigame"},
+		{nullptr, "set_no_bonus_area"},
+		{nullptr, "unset_no_bonus_area"},
+		{nullptr, "redirect_port"},
+		{nullptr, "hide_from_spec_count"},
+		{nullptr, "save_drop"},
+		{nullptr, "list_saved_tees"},
+		{nullptr, "1vs1_global_create"},
+		{nullptr, "1vs1_global_start"},
+		{nullptr, "jail_arrest"},
+		{nullptr, "jail_release"},
+		{nullptr, "view_cursor"},
+		{nullptr, "view_cursor_zoomed"},
+		{nullptr, "whois"},
+		{nullptr, "whoisid"},
+		{nullptr, "whitelist_add"},
+		{nullptr, "whitelist_remove"},
+		{nullptr, "whitelist"},
+		{nullptr, "bot_lookup"},
+		{nullptr, "antibot_info"},
+		{nullptr, "acc_sys_unban"},
+		{nullptr, "acc_sys_bans"},
+		{nullptr, "toteleplot"},
+		{nullptr, "clearplot"},
+		{nullptr, "plot_owner"},
+		{nullptr, "plot_info"},
+		{nullptr, "preset_list"},
+		{nullptr, "reload_designs"},
+		{nullptr, "reload_languages"},
+		{nullptr, "list_loaded_languages"},
+		{nullptr, "add_grog"},
+		{nullptr, "set_permille"},
+		{nullptr, "sound"},
+		{nullptr, "map_sound"},
+		{nullptr, "lasertext"},
+		{nullptr, "sendmotd"},
+		{nullptr, "helicopter"},
+		{nullptr, "remove_helicopters"},
+		{nullptr, "snake"},
+		{nullptr, "force_transform_zombie"},
+		{nullptr, "force_transform_human"},
+		{nullptr, "set_double_xp_lifes"},
+		{nullptr, "set_taser_shield"},
+		{nullptr, "player_name"},
+		{nullptr, "player_clan"},
+		{nullptr, "player_skin"},
+		{nullptr, "playerinfo"},
+		{nullptr, "item"},
+		{nullptr, "invisible"},
+		{nullptr, "hookpower"},
+		{nullptr, "freezehammer"},
+		{nullptr, "setjumps"},
+		{nullptr, "infinitejumps"},
+		{nullptr, "rainbowspeed"},
+		{nullptr, "rainbow"},
+		{nullptr, "infrainbow"},
+		{nullptr, "atom"},
+		{nullptr, "trail"},
+		{nullptr, "spookyghost"},
+		{nullptr, "addmeteor"},
+		{nullptr, "addinfmeteor"},
+		{nullptr, "removemeteors"},
+		{nullptr, "passive"},
+		{nullptr, "vanillamode"},
+		{nullptr, "ddracemode"},
+		{nullptr, "bloody"},
+		{nullptr, "strongbloody"},
+		{nullptr, "alwaysteleweapon"},
+		{nullptr, "telegun"},
+		{nullptr, "telegrenade"},
+		{nullptr, "telelaser"},
+		{nullptr, "doorhammer"},
+		{nullptr, "lovely"},
+		{nullptr, "rotatingball"},
+		{nullptr, "epiccircle"},
+		{nullptr, "staffind"},
+		{nullptr, "rainbowname"},
+		{nullptr, "confetti"},
+		{nullptr, "sparkle"},
+		{nullptr, "acc_logout_port"},
+		{nullptr, "acc_logout"},
+		{nullptr, "acc_disable"},
+		{nullptr, "acc_info"},
+		{nullptr, "acc_add_euros"},
+		{nullptr, "acc_edit"},
+		{nullptr, "acc_level_needed_xp"},
+		{nullptr, "server_alert"},
+		{nullptr, "mod_alert"},
+	};
+
+	struct SCompatRegistration
+	{
+		SFddraceCompatCommandContext *m_pContext;
+		const char *m_pParams;
+		int m_Flags;
+		const char *m_pHelp;
+	};
+
+	static SCompatRegistration s_aRegistrations[] = {
+		{&s_aCompatCommands[0], "?s[filter]", CFGFLAG_SERVER, "F-DDrace: recently left players (not ported yet)"},
+		{&s_aCompatCommands[1], "?v[id] ?i[spread]", CFGFLAG_SERVER | CMDFLAG_TEST, "F-DDrace: give extra weapons (not ported yet)"},
+		{&s_aCompatCommands[2], "?v[id]", CFGFLAG_SERVER | CMDFLAG_TEST, "F-DDrace: remove extra weapons (not ported yet)"},
+		{&s_aCompatCommands[3], "?v[id] ?i[spread]", CFGFLAG_SERVER | CMDFLAG_TEST, "F-DDrace: plasmarifle (not ported yet)"},
+		{&s_aCompatCommands[4], "?v[id]", CFGFLAG_SERVER | CMDFLAG_TEST, "F-DDrace: unplasmarifle (not ported yet)"},
+		{&s_aCompatCommands[5], "?v[id] ?i[spread]", CFGFLAG_SERVER | CMDFLAG_TEST, "F-DDrace: heartgun (not ported yet)"},
+		{&s_aCompatCommands[6], "?v[id]", CFGFLAG_SERVER | CMDFLAG_TEST, "F-DDrace: unheartgun (not ported yet)"},
+		{&s_aCompatCommands[7], "?v[id] ?i[spread]", CFGFLAG_SERVER | CMDFLAG_TEST, "F-DDrace: straightgrenade (not ported yet)"},
+		{&s_aCompatCommands[8], "?v[id]", CFGFLAG_SERVER | CMDFLAG_TEST, "F-DDrace: unstraightgrenade (not ported yet)"},
+		{&s_aCompatCommands[9], "?v[id]", CFGFLAG_SERVER | CMDFLAG_TEST, "F-DDrace: telekinesis (not ported yet)"},
+		{&s_aCompatCommands[10], "?v[id]", CFGFLAG_SERVER | CMDFLAG_TEST, "F-DDrace: untelekinesis (not ported yet)"},
+		{&s_aCompatCommands[11], "?v[id]", CFGFLAG_SERVER | CMDFLAG_TEST, "F-DDrace: lightsaber (not ported yet)"},
+		{&s_aCompatCommands[12], "?v[id]", CFGFLAG_SERVER | CMDFLAG_TEST, "F-DDrace: unlightsaber (not ported yet)"},
+		{&s_aCompatCommands[13], "?v[id]", CFGFLAG_SERVER | CMDFLAG_TEST, "F-DDrace: portalrifle (not ported yet)"},
+		{&s_aCompatCommands[14], "?v[id]", CFGFLAG_SERVER | CMDFLAG_TEST, "F-DDrace: unportalrifle (not ported yet)"},
+		{&s_aCompatCommands[15], "?v[id] ?i[spread]", CFGFLAG_SERVER | CMDFLAG_TEST, "F-DDrace: projectilerifle (not ported yet)"},
+		{&s_aCompatCommands[16], "?v[id]", CFGFLAG_SERVER | CMDFLAG_TEST, "F-DDrace: unprojectilerifle (not ported yet)"},
+		{&s_aCompatCommands[17], "?v[id] ?i[spread]", CFGFLAG_SERVER | CMDFLAG_TEST, "F-DDrace: ballgrenade (not ported yet)"},
+		{&s_aCompatCommands[18], "?v[id]", CFGFLAG_SERVER | CMDFLAG_TEST, "F-DDrace: unballgrenade (not ported yet)"},
+		{&s_aCompatCommands[19], "?v[id]", CFGFLAG_SERVER | CMDFLAG_TEST, "F-DDrace: telerifle (not ported yet)"},
+		{&s_aCompatCommands[20], "?v[id]", CFGFLAG_SERVER | CMDFLAG_TEST, "F-DDrace: untelerifle (not ported yet)"},
+		{&s_aCompatCommands[21], "?v[id]", CFGFLAG_SERVER | CMDFLAG_TEST, "F-DDrace: taser (not ported yet)"},
+		{&s_aCompatCommands[22], "?v[id]", CFGFLAG_SERVER | CMDFLAG_TEST, "F-DDrace: untaser (not ported yet)"},
+		{&s_aCompatCommands[23], "?v[id]", CFGFLAG_SERVER | CMDFLAG_TEST, "F-DDrace: lightninglaser (not ported yet)"},
+		{&s_aCompatCommands[24], "?v[id]", CFGFLAG_SERVER | CMDFLAG_TEST, "F-DDrace: unlightninglaser (not ported yet)"},
+		{&s_aCompatCommands[25], "?v[id]", CFGFLAG_SERVER | CMDFLAG_TEST, "F-DDrace: hammer (not ported yet)"},
+		{&s_aCompatCommands[26], "?v[id] ?i[spread]", CFGFLAG_SERVER | CMDFLAG_TEST, "F-DDrace: gun (not ported yet)"},
+		{&s_aCompatCommands[27], "?v[id]", CFGFLAG_SERVER | CMDFLAG_TEST, "F-DDrace: unhammer (not ported yet)"},
+		{&s_aCompatCommands[28], "?v[id]", CFGFLAG_SERVER | CMDFLAG_TEST, "F-DDrace: ungun (not ported yet)"},
+		{&s_aCompatCommands[29], "?v[id]", CFGFLAG_SERVER | CMDFLAG_TEST, "F-DDrace: draweditor (not ported yet)"},
+		{&s_aCompatCommands[30], "?v[id]", CFGFLAG_SERVER | CMDFLAG_TEST, "F-DDrace: undraweditor (not ported yet)"},
+		{&s_aCompatCommands[31], "?v[id]", CFGFLAG_SERVER | CMDFLAG_TEST, "F-DDrace: scrollninja (not ported yet)"},
+		{&s_aCompatCommands[32], "?i[amount] ?i[dummymode]", CFGFLAG_SERVER, "F-DDrace: connectdummy (not ported yet)"},
+		{&s_aCompatCommands[33], "v[id]", CFGFLAG_SERVER, "F-DDrace: disconnectdummy (not ported yet)"},
+		{&s_aCompatCommands[34], "?v[id] ?i[dummymode]", CFGFLAG_SERVER, "F-DDrace: dummymode (not ported yet)"},
+		{&s_aCompatCommands[35], "", CFGFLAG_SERVER, "F-DDrace: connectdefaultdummies (not ported yet)"},
+		{&s_aCompatCommands[36], "", CFGFLAG_SERVER, "F-DDrace: punchbag (not ported yet)"},
+		{&s_aCompatCommands[37], "v[id] s[tuning] i[value]", CFGFLAG_SERVER, "F-DDrace: tune_lock_pl (not ported yet)"},
+		{&s_aCompatCommands[38], "v[id] ?s[tuning]", CFGFLAG_SERVER, "F-DDrace: tune_lock_pl_reset (not ported yet)"},
+		{&s_aCompatCommands[39], "v[id]", CFGFLAG_SERVER, "F-DDrace: tune_lock_pl_dump (not ported yet)"},
+		{&s_aCompatCommands[40], "i[flag] ?i[id]", CFGFLAG_SERVER | CMDFLAG_TEST, "F-DDrace: forceflagowner (not ported yet)"},
+		{&s_aCompatCommands[41], "v[id] r[text]", CFGFLAG_SERVER, "F-DDrace: say_by (not ported yet)"},
+		{&s_aCompatCommands[42], "?v[id] ?i[forcedid]", CFGFLAG_SERVER, "F-DDrace: teecontrol (not ported yet)"},
+		{&s_aCompatCommands[43], "v[id] s[minigame]", CFGFLAG_SERVER, "F-DDrace: set_minigame (not ported yet)"},
+		{&s_aCompatCommands[44], "?v[id]", CFGFLAG_SERVER, "F-DDrace: set_no_bonus_area (not ported yet)"},
+		{&s_aCompatCommands[45], "?v[id]", CFGFLAG_SERVER, "F-DDrace: unset_no_bonus_area (not ported yet)"},
+		{&s_aCompatCommands[46], "i[port] ?v[id]", CFGFLAG_SERVER, "F-DDrace: redirect_port (not ported yet)"},
+		{&s_aCompatCommands[47], "?i['0'|'1']", CFGFLAG_SERVER, "F-DDrace: hide_from_spec_count (not ported yet)"},
+		{&s_aCompatCommands[48], "?v[id] ?f[hours] ?r[text]", CFGFLAG_SERVER, "F-DDrace: save_drop (not ported yet)"},
+		{&s_aCompatCommands[49], "", CFGFLAG_SERVER, "F-DDrace: list_saved_tees (not ported yet)"},
+		{&s_aCompatCommands[50], "?i[scorelimit] ?i[killborder]", CFGFLAG_SERVER, "F-DDrace: 1vs1_global_create (not ported yet)"},
+		{&s_aCompatCommands[51], "i[id] i[id]", CFGFLAG_SERVER, "F-DDrace: 1vs1_global_start (not ported yet)"},
+		{&s_aCompatCommands[52], "v[id] i[seconds]", CFGFLAG_SERVER, "F-DDrace: jail_arrest (not ported yet)"},
+		{&s_aCompatCommands[53], "v[id]", CFGFLAG_SERVER, "F-DDrace: jail_release (not ported yet)"},
+		{&s_aCompatCommands[54], "?i[id]", CFGFLAG_SERVER, "F-DDrace: view_cursor (not ported yet)"},
+		{&s_aCompatCommands[55], "?i[id]", CFGFLAG_SERVER, "F-DDrace: view_cursor_zoomed (not ported yet)"},
+		{&s_aCompatCommands[56], "i[mode] i[cutoff] r[name]", CFGFLAG_SERVER, "F-DDrace: whois (not ported yet)"},
+		{&s_aCompatCommands[57], "i[mode] i[cutoff] v[id]", CFGFLAG_SERVER, "F-DDrace: whoisid (not ported yet)"},
+		{&s_aCompatCommands[58], "s[ip] ?s[reason]", CFGFLAG_SERVER, "F-DDrace: whitelist_add (not ported yet)"},
+		{&s_aCompatCommands[59], "s[ip/index]", CFGFLAG_SERVER, "F-DDrace: whitelist_remove (not ported yet)"},
+		{&s_aCompatCommands[60], "", CFGFLAG_SERVER, "F-DDrace: whitelist (not ported yet)"},
+		{&s_aCompatCommands[61], "", CFGFLAG_SERVER, "F-DDrace: bot_lookup (not ported yet)"},
+		{&s_aCompatCommands[62], "", CFGFLAG_SERVER, "F-DDrace: antibot_info (not ported yet)"},
+		{&s_aCompatCommands[63], "i[index]", CFGFLAG_SERVER, "F-DDrace: acc_sys_unban (not ported yet)"},
+		{&s_aCompatCommands[64], "", CFGFLAG_SERVER, "F-DDrace: acc_sys_bans (not ported yet)"},
+		{&s_aCompatCommands[65], "i[plotid] ?v[id]", CFGFLAG_SERVER | CMDFLAG_TEST, "F-DDrace: toteleplot (not ported yet)"},
+		{&s_aCompatCommands[66], "i[plotid]", CFGFLAG_SERVER, "F-DDrace: clearplot (not ported yet)"},
+		{&s_aCompatCommands[67], "s[username] i[plotid]", CFGFLAG_SERVER, "F-DDrace: plot_owner (not ported yet)"},
+		{&s_aCompatCommands[68], "i[plotid]", CFGFLAG_SERVER, "F-DDrace: plot_info (not ported yet)"},
+		{&s_aCompatCommands[69], "", CFGFLAG_SERVER, "F-DDrace: preset_list (not ported yet)"},
+		{&s_aCompatCommands[70], "", CFGFLAG_SERVER, "F-DDrace: reload_designs (not ported yet)"},
+		{&s_aCompatCommands[71], "", CFGFLAG_SERVER, "F-DDrace: reload_languages (not ported yet)"},
+		{&s_aCompatCommands[72], "", CFGFLAG_SERVER, "F-DDrace: list_loaded_languages (not ported yet)"},
+		{&s_aCompatCommands[73], "?v[id]", CFGFLAG_SERVER | CMDFLAG_TEST, "F-DDrace: add_grog (not ported yet)"},
+		{&s_aCompatCommands[74], "v[id] f[permille]", CFGFLAG_SERVER | CMDFLAG_TEST, "F-DDrace: set_permille (not ported yet)"},
+		{&s_aCompatCommands[75], "i[sound] ?v[id]", CFGFLAG_SERVER, "F-DDrace: sound (not ported yet)"},
+		{&s_aCompatCommands[76], "i[sound-id] ?v[id]", CFGFLAG_SERVER, "F-DDrace: map_sound (not ported yet)"},
+		{&s_aCompatCommands[77], "v[id] r[text]", CFGFLAG_SERVER, "F-DDrace: lasertext (not ported yet)"},
+		{&s_aCompatCommands[78], "v[id] i[footer] r[text]", CFGFLAG_SERVER, "F-DDrace: sendmotd (not ported yet)"},
+		{&s_aCompatCommands[79], "?v[id] ?i[turrettype] ?f[scale]", CFGFLAG_SERVER | CMDFLAG_TEST, "F-DDrace: helicopter (not ported yet)"},
+		{&s_aCompatCommands[80], "", CFGFLAG_SERVER, "F-DDrace: remove_helicopters (not ported yet)"},
+		{&s_aCompatCommands[81], "?v[id]", CFGFLAG_SERVER | CMDFLAG_TEST, "F-DDrace: snake (not ported yet)"},
+		{&s_aCompatCommands[82], "?v[id]", CFGFLAG_SERVER | CMDFLAG_TEST, "F-DDrace: force_transform_zombie (not ported yet)"},
+		{&s_aCompatCommands[83], "?v[id]", CFGFLAG_SERVER | CMDFLAG_TEST, "F-DDrace: force_transform_human (not ported yet)"},
+		{&s_aCompatCommands[84], "v[id] i[amount]", CFGFLAG_SERVER | CMDFLAG_TEST, "F-DDrace: set_double_xp_lifes (not ported yet)"},
+		{&s_aCompatCommands[85], "v[id] i[percentage]", CFGFLAG_SERVER | CMDFLAG_TEST, "F-DDrace: set_taser_shield (not ported yet)"},
+		{&s_aCompatCommands[86], "v[id] ?r[name]", CFGFLAG_SERVER, "F-DDrace: player_name (not ported yet)"},
+		{&s_aCompatCommands[87], "v[id] ?r[clan]", CFGFLAG_SERVER, "F-DDrace: player_clan (not ported yet)"},
+		{&s_aCompatCommands[88], "v[id] ?r[skin]", CFGFLAG_SERVER, "F-DDrace: player_skin (not ported yet)"},
+		{&s_aCompatCommands[89], "v[id]", CFGFLAG_SERVER, "F-DDrace: playerinfo (not ported yet)"},
+		{&s_aCompatCommands[90], "v[id] i[item]", CFGFLAG_SERVER, "F-DDrace: item (not ported yet)"},
+		{&s_aCompatCommands[91], "?v[id]", CFGFLAG_SERVER | CMDFLAG_TEST, "F-DDrace: invisible (not ported yet)"},
+		{&s_aCompatCommands[92], "?s[power] ?v[id]", CFGFLAG_SERVER, "F-DDrace: hookpower (not ported yet)"},
+		{&s_aCompatCommands[93], "?v[id]", CFGFLAG_SERVER | CMDFLAG_TEST, "F-DDrace: freezehammer (not ported yet)"},
+		{&s_aCompatCommands[94], "?v[id] ?i[jumps]", CFGFLAG_SERVER | CMDFLAG_TEST, "F-DDrace: setjumps (not ported yet)"},
+		{&s_aCompatCommands[95], "?v[id]", CFGFLAG_SERVER | CMDFLAG_TEST, "F-DDrace: infinitejumps (not ported yet)"},
+		{&s_aCompatCommands[96], "?v[id] ?i[speed]", CFGFLAG_SERVER, "F-DDrace: rainbowspeed (not ported yet)"},
+		{&s_aCompatCommands[97], "?v[id]", CFGFLAG_SERVER, "F-DDrace: rainbow (not ported yet)"},
+		{&s_aCompatCommands[98], "?v[id]", CFGFLAG_SERVER, "F-DDrace: infrainbow (not ported yet)"},
+		{&s_aCompatCommands[99], "?v[id]", CFGFLAG_SERVER, "F-DDrace: atom (not ported yet)"},
+		{&s_aCompatCommands[100], "?v[id]", CFGFLAG_SERVER, "F-DDrace: trail (not ported yet)"},
+		{&s_aCompatCommands[101], "?v[id]", CFGFLAG_SERVER, "F-DDrace: spookyghost (not ported yet)"},
+		{&s_aCompatCommands[102], "?v[id]", CFGFLAG_SERVER, "F-DDrace: addmeteor (not ported yet)"},
+		{&s_aCompatCommands[103], "?v[id]", CFGFLAG_SERVER, "F-DDrace: addinfmeteor (not ported yet)"},
+		{&s_aCompatCommands[104], "?v[id]", CFGFLAG_SERVER, "F-DDrace: removemeteors (not ported yet)"},
+		{&s_aCompatCommands[105], "?v[id]", CFGFLAG_SERVER | CMDFLAG_TEST, "F-DDrace: passive (not ported yet)"},
+		{&s_aCompatCommands[106], "?v[id]", CFGFLAG_SERVER, "F-DDrace: vanillamode (not ported yet)"},
+		{&s_aCompatCommands[107], "?v[id]", CFGFLAG_SERVER, "F-DDrace: ddracemode (not ported yet)"},
+		{&s_aCompatCommands[108], "?v[id]", CFGFLAG_SERVER, "F-DDrace: bloody (not ported yet)"},
+		{&s_aCompatCommands[109], "?v[id]", CFGFLAG_SERVER, "F-DDrace: strongbloody (not ported yet)"},
+		{&s_aCompatCommands[110], "?v[id]", CFGFLAG_SERVER | CMDFLAG_TEST, "F-DDrace: alwaysteleweapon (not ported yet)"},
+		{&s_aCompatCommands[111], "?v[id]", CFGFLAG_SERVER | CMDFLAG_TEST, "F-DDrace: telegun (not ported yet)"},
+		{&s_aCompatCommands[112], "?v[id]", CFGFLAG_SERVER | CMDFLAG_TEST, "F-DDrace: telegrenade (not ported yet)"},
+		{&s_aCompatCommands[113], "?v[id]", CFGFLAG_SERVER | CMDFLAG_TEST, "F-DDrace: telelaser (not ported yet)"},
+		{&s_aCompatCommands[114], "?v[id]", CFGFLAG_SERVER | CMDFLAG_TEST, "F-DDrace: doorhammer (not ported yet)"},
+		{&s_aCompatCommands[115], "?v[id]", CFGFLAG_SERVER, "F-DDrace: lovely (not ported yet)"},
+		{&s_aCompatCommands[116], "?v[id]", CFGFLAG_SERVER, "F-DDrace: rotatingball (not ported yet)"},
+		{&s_aCompatCommands[117], "?v[id]", CFGFLAG_SERVER, "F-DDrace: epiccircle (not ported yet)"},
+		{&s_aCompatCommands[118], "?v[id]", CFGFLAG_SERVER, "F-DDrace: staffind (not ported yet)"},
+		{&s_aCompatCommands[119], "?v[id]", CFGFLAG_SERVER, "F-DDrace: rainbowname (not ported yet)"},
+		{&s_aCompatCommands[120], "?v[id]", CFGFLAG_SERVER, "F-DDrace: confetti (not ported yet)"},
+		{&s_aCompatCommands[121], "?v[id]", CFGFLAG_SERVER, "F-DDrace: sparkle (not ported yet)"},
+		{&s_aCompatCommands[122], "i[port]", CFGFLAG_SERVER, "F-DDrace: acc_logout_port (not ported yet)"},
+		{&s_aCompatCommands[123], "s[username]", CFGFLAG_SERVER, "F-DDrace: acc_logout (not ported yet)"},
+		{&s_aCompatCommands[124], "s[username]", CFGFLAG_SERVER, "F-DDrace: acc_disable (not ported yet)"},
+		{&s_aCompatCommands[125], "s[username]", CFGFLAG_SERVER, "F-DDrace: acc_info (not ported yet)"},
+		{&s_aCompatCommands[126], "s[username] f[amount]", CFGFLAG_SERVER, "F-DDrace: acc_add_euros (not ported yet)"},
+		{&s_aCompatCommands[127], "s[username] s[variable] ?r[value]", CFGFLAG_SERVER, "F-DDrace: acc_edit (not ported yet)"},
+		{&s_aCompatCommands[128], "i[level]", CFGFLAG_SERVER, "F-DDrace: acc_level_needed_xp (not ported yet)"},
+		{&s_aCompatCommands[129], "r[message]", CFGFLAG_SERVER, "F-DDrace: server_alert (not ported yet)"},
+		{&s_aCompatCommands[130], "v[id] r[message]", CFGFLAG_SERVER, "F-DDrace: mod_alert (not ported yet)"},
+	};
+
+	for(auto &Registration : s_aRegistrations)
+	{
+		Registration.m_pContext->m_pGameContext = this;
+		Console()->Register(Registration.m_pContext->m_pName, Registration.m_pParams, Registration.m_Flags, ConFddraceCompatNotImplemented, Registration.m_pContext, Registration.m_pHelp);
+	}
+}
+#endif
 
 void CGameContext::RegisterChatCommands()
 {
@@ -4437,6 +4777,21 @@ void CGameContext::CreateAllEntities(bool Initial)
 				const int SwitchType = pSwitch[Index].m_Type;
 				// TODO: Add off by default door here
 				// if(SwitchType == TILE_DOOR_OFF)
+#ifdef CONF_FDDRACE_MOD
+				// Absolute F-DDrace plot/redirect switch types must not be treated as
+				// DDNet relative entities (192 → ENTITY_SPAWN).
+				if(CCollision::IsPlotTile(SwitchType) ||
+					SwitchType == TILE_SWITCH_REDIRECT_SERVER_FROM ||
+					SwitchType == TILE_SWITCH_REDIRECT_SERVER_TO)
+				{
+					if(Initial && SwitchType == TILE_SWITCH_PLOT)
+					{
+						dbg_msg("fddrace", "plot tile at (%d,%d) switch=%d plot=%d",
+							x, y, pSwitch[Index].m_Number, m_Collision.GetPlotBySwitch(pSwitch[Index].m_Number));
+					}
+				}
+				else
+#endif
 				if(SwitchType >= ENTITY_OFFSET)
 				{
 					m_pController->OnEntity(SwitchType - ENTITY_OFFSET, x, y, LAYER_SWITCH, pSwitch[Index].m_Flags, Initial, pSwitch[Index].m_Number);
@@ -5434,3 +5789,16 @@ void CGameContext::ReinitPlayerMap(int ClientId, bool Timeout)
 	SixupCfg.m_ClearSlots = true;
 	m_PlayerMapping.InitPlayerMap(ClientId, SixupCfg);
 }
+
+#ifdef CONF_FDDRACE_MOD
+void CGameContext::HandleDiscordMessage(const char *pUsername, const char *pUserID, const char *pText, const char *pEvent)
+{
+	(void)pUserID;
+	(void)pEvent;
+	if(!pUsername || !pText || !pText[0])
+		return;
+	char aBuf[512];
+	str_format(aBuf, sizeof(aBuf), "[Discord] @%s: %s", pUsername, pText);
+	SendChat(-1, TEAM_ALL, aBuf);
+}
+#endif

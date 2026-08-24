@@ -178,6 +178,9 @@ class CGameContext : public IGameServer
 	static void ConchainSettingUpdate(IConsole::IResult *pResult, void *pUserData, IConsole::FCommandCallback pfnCallback, void *pCallbackUserData);
 	static void ConchainPracticeByDefaultUpdate(IConsole::IResult *pResult, void *pUserData, IConsole::FCommandCallback pfnCallback, void *pCallbackUserData);
 	static void ConDumpLog(IConsole::IResult *pResult, void *pUserData);
+#ifdef CONF_FDDRACE_MOD
+	static void ConClientInfo(IConsole::IResult *pResult, void *pUserData);
+#endif
 
 	void AddVote(const char *pDescription, const char *pCommand);
 	static int MapScan(const char *pName, int IsDir, int DirType, void *pUserData);
@@ -347,8 +350,14 @@ public:
 	// engine events
 	void OnInit(const void *pPersistentData) override;
 	void OnConsoleInit() override;
+#ifdef CONF_FDDRACE_MOD
+	void HandleDiscordMessage(const char *pUsername, const char *pUserID, const char *pText, const char *pEvent = nullptr);
+#endif
 	void RegisterDDRaceCommands();
 	void RegisterChatCommands();
+#ifdef CONF_FDDRACE_MOD
+	void RegisterFddraceCompatCommands();
+#endif
 	[[nodiscard]] bool OnMapChange(char *pNewMapName, int MapNameSize) override;
 	void OnShutdown(void *pPersistentData) override;
 
@@ -618,6 +627,12 @@ private:
 	static void ConVoteUnmuteId(IConsole::IResult *pResult, void *pUserData);
 	static void ConVoteUnmuteIp(IConsole::IResult *pResult, void *pUserData);
 	static void ConVoteMutes(IConsole::IResult *pResult, void *pUserData);
+
+#ifdef CONF_FDDRACE_MOD
+	static void ConFddraceCompatNotImplemented(IConsole::IResult *pResult, void *pUserData);
+	static void ConAllWeaponsCompat(IConsole::IResult *pResult, void *pUserData);
+	static void ConUnAllWeaponsCompat(IConsole::IResult *pResult, void *pUserData);
+#endif
 
 	void Whisper(int ClientId, char *pStr);
 	int WhisperRecordFlag(int ClientId) const;

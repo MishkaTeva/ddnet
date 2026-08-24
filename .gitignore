@@ -152,3 +152,6 @@ tags
 *.vcxproj
 *.zip
 # tidy-alphabetical-end
+
+# Local Discord bot secret — never commit
+discord_bot.token

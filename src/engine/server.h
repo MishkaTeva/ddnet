@@ -27,6 +27,7 @@
 
 struct CAntibotRoundData;
 class IMap;
+class CAntiCheat;
 
 // When recording a demo on the server, the ClientId -1 is used
 enum
@@ -381,6 +382,17 @@ public:
 	virtual bool IsSixup(int ClientId) const = 0;
 	virtual int GetMaxClients(int ClientId) const = 0;
 	virtual bool ClientSupportsServerMaxClients(int ClientId) const = 0;
+
+	virtual const char *GetClientVersionStr(int ClientId) const = 0;
+	virtual const char *GetClientNetVersion(int ClientId) const = 0;
+	virtual const char *GetAuthIdent(int ClientId) const = 0;
+	virtual void GetClientAddrStr(int ClientId, char *pAddrStr, int Size, bool IncludePort) const = 0;
+	virtual void SendWebhookMessage(const char *pUrl, const char *pMessage, const char *pUsername = "", const char *pAvatarUrl = "") = 0;
+	virtual const char *GetClientIamTaterStr(int ClientId) const = 0;
+	virtual bool IsClientTClientVerified(int ClientId) const = 0;
+	virtual bool IsClientHardcodedHash(int ClientId) const = 0;
+	virtual bool IsOldClient(int ClientId) const = 0;
+	virtual class CAntiCheat *AntiCheat() = 0;
 };
 
 class IGameServer : public IInterface

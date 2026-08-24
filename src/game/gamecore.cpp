@@ -17,6 +17,7 @@ const char *CTuningParams::ms_apNames[] =
 	{
 #define MACRO_TUNING_PARAM(Name, ScriptName, Value, Description) #ScriptName,
 #include "tuning.h"
+#include "tuning_mod.h"
 #undef MACRO_TUNING_PARAM
 };
 
