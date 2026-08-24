@@ -173,8 +173,8 @@ public:
 		return m_pPrng->RandomBits() % BelowThis;
 	}
 
-	class CCharacterCore *m_apCharacters[MAX_CLIENTS];
-	CPrng *m_pPrng;
+	class CCharacterCore *m_apCharacters[MAX_CLIENTS] = {};
+	CPrng *m_pPrng = nullptr;
 
 	void InitSwitchers(int HighestSwitchNumber);
 	std::vector<SSwitchers> m_vSwitchers;

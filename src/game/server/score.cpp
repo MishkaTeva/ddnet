@@ -95,7 +95,7 @@ CScore::CScore(CGameContext *pGameServer, CDbConnectionPool *pPool) :
 		while(const char *pLine = LineReader.Get())
 		{
 			char aWord[32] = {0};
-			sscanf(pLine, "%*s %31s", aWord);
+			(void)sscanf(pLine, "%*s %31s", aWord);
 			aWord[31] = 0;
 			m_vWordlist.emplace_back(aWord);
 		}

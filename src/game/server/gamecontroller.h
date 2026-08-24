@@ -57,12 +57,13 @@ protected:
 			m_Got = false;
 			m_FriendlyTeam = -1;
 			m_Pos = vec2(100, 100);
+			m_Score = 0.0f;
 		}
 
 		vec2 m_Pos;
 		bool m_Got;
 		int m_FriendlyTeam;
-		float m_Score;
+		float m_Score = 0.0f;
 	};
 
 	float EvaluateSpawnPos(CSpawnEval *pEval, vec2 Pos, int ClientId);

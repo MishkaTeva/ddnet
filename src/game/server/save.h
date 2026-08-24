@@ -70,8 +70,8 @@ public:
 private:
 	int m_ClientId;
 
-	char m_aString[MAX_SAVE_TEE_STRING_LENGTH];
-	char m_aName[16];
+	char m_aString[MAX_SAVE_TEE_STRING_LENGTH] = {};
+	char m_aName[16] = {};
 
 	int m_Alive;
 	int m_Paused;
@@ -199,7 +199,7 @@ public:
 private:
 	CCharacter *MatchCharacter(CGameContext *pGameServer, int ClientId, int SaveId, bool KeepCurrentCharacter) const;
 
-	char m_aString[MAX_SAVE_STRING_LENGTH];
+	char m_aString[MAX_SAVE_STRING_LENGTH] = {};
 
 	struct SSimpleSwitchers
 	{

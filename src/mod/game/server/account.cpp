@@ -41,8 +41,8 @@ void CAccountSystem::Shutdown()
 
 void CAccountSystem::EnsureDir() const
 {
-	fs_makedir_rec_for(g_Config.m_SvAccFilePath);
-	fs_makedir(g_Config.m_SvAccFilePath);
+	(void)fs_makedir_rec_for(g_Config.m_SvAccFilePath);
+	(void)fs_makedir(g_Config.m_SvAccFilePath);
 }
 
 void CAccountSystem::AccountPath(char *pBuf, int BufSize, const char *pUsername) const
