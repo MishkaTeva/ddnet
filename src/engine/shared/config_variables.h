@@ -808,3 +808,4 @@ MACRO_CONFIG_STR(SvWebhookModLogURL, sv_webhook_mod_log_url, 128, "", CFGFLAG_SE
 MACRO_CONFIG_INT(SvPortalRadius, sv_portal_radius, 46, 0, 1024, CFGFLAG_SERVER, "Radius of a portal for portal travel")
 MACRO_CONFIG_INT(SvPortalDetonation, sv_portal_detonation, 10, 0, 60, CFGFLAG_SERVER, "Seconds until an unlinked portal detonates")
 MACRO_CONFIG_INT(SvPortalDetonationLinked, sv_portal_detonation_linked, 5, 0, 60, CFGFLAG_SERVER, "Seconds until linked portals detonate")
+MACRO_CONFIG_INT(SvDestroyDropsOnLeave, sv_destroy_drops_on_leave, 0, 0, 1, CFGFLAG_SERVER, "Destroy dropped pickups when their owner disconnects")

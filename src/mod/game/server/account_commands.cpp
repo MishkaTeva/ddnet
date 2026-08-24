@@ -14,6 +14,7 @@
 #include <mod/game/server/entities/lightsaber.h>
 #include <mod/game/server/entities/lovely.h>
 #include <mod/game/server/entities/mute_gag.h>
+#include <mod/game/server/entities/pickup_drop.h>
 #include <mod/game/server/entities/portal.h>
 #include <mod/game/server/entities/rotating_ball.h>
 #include <mod/game/server/entities/staff_ind.h>
@@ -387,6 +388,47 @@ void CGameContext::ConSpawnStableProjectile(IConsole::IResult *pResult, void *pU
 	pSelf->Console()->Print(IConsole::OUTPUT_LEVEL_STANDARD, "stable_projectile", "Spawned");
 }
 
+void CGameContext::ConDropPickup(IConsole::IResult *pResult, void *pUserData)
+{
+	CGameContext *pSelf = (CGameContext *)pUserData;
+	const int ClientId = pResult->GetVictim();
+	CCharacter *pChr = pSelf->GetPlayerChar(ClientId);
+	if(!pChr)
+		return;
+
+	const char *pKind = pResult->NumArguments() > 1 ? pResult->GetString(1) : "health";
+	int Type = POWERUP_HEALTH;
+	int Weapon = WEAPON_GUN;
+	if(!str_comp_nocase(pKind, "armor") || !str_comp_nocase(pKind, "shield"))
+		Type = POWERUP_ARMOR;
+	else if(!str_comp_nocase(pKind, "weapon") || !str_comp_nocase(pKind, "gun") || !str_comp_nocase(pKind, "shotgun") ||
+		!str_comp_nocase(pKind, "grenade") || !str_comp_nocase(pKind, "laser") || !str_comp_nocase(pKind, "ninja"))
+	{
+		Type = POWERUP_WEAPON;
+		if(!str_comp_nocase(pKind, "shotgun"))
+			Weapon = WEAPON_SHOTGUN;
+		else if(!str_comp_nocase(pKind, "grenade"))
+			Weapon = WEAPON_GRENADE;
+		else if(!str_comp_nocase(pKind, "laser"))
+			Weapon = WEAPON_LASER;
+		else if(!str_comp_nocase(pKind, "ninja"))
+			Weapon = WEAPON_NINJA;
+		else if(!str_comp_nocase(pKind, "gun") || !str_comp_nocase(pKind, "weapon"))
+			Weapon = pResult->NumArguments() > 2 ? pResult->GetInteger(2) : WEAPON_GUN;
+		if(Weapon < WEAPON_GUN || Weapon >= NUM_WEAPONS)
+			Weapon = WEAPON_GUN;
+	}
+	else if(str_comp_nocase(pKind, "health") != 0 && str_comp_nocase(pKind, "heart") != 0)
+	{
+		pSelf->Console()->Print(IConsole::OUTPUT_LEVEL_STANDARD, "pickup_drop", "kind: health|armor|gun|shotgun|grenade|laser|ninja|weapon");
+		return;
+	}
+
+	const float Dir = pChr->Core()->m_Input.m_Direction ? (float)pChr->Core()->m_Input.m_Direction : (pChr->Core()->m_Angle < 0 ? -1.f : 1.f);
+	new CPickupDrop(&pSelf->m_World, pChr->GetPos(), Type, ClientId, Dir, 300, Weapon);
+	pSelf->Console()->Print(IConsole::OUTPUT_LEVEL_STANDARD, "pickup_drop", "Dropped");
+}
+
 void CGameContext::RegisterFddraceAccountCommands()
 {
 	Console()->Register("register", "s[name] s[password] s[password]", CFGFLAG_CHAT | CFGFLAG_SERVER, ConRegister, this, "Register an account");
@@ -415,6 +457,7 @@ void CGameContext::RegisterFddraceAccountCommands()
 	Console()->Register("lightsaber", "v[id] ?s[extend|retract|toggle]", CFGFLAG_SERVER, ConLightsaber, this, "Extend/retract lightsaber for player");
 	Console()->Register("ban_plunger_fx", "v[id] ?i[seconds] ?r[reason]", CFGFLAG_SERVER, ConBanPlungerFx, this, "Spawn ban plunger VFX (bans after animation)");
 	Console()->Register("spawn_stable_projectile", "v[id] ?i[type] ?i[x] ?i[y]", CFGFLAG_SERVER, ConSpawnStableProjectile, this, "Spawn stable projectile (type: gun/shotgun/grenade ids)");
+	Console()->Register("drop_pickup", "v[id] ?s[kind] ?i[weapon]", CFGFLAG_SERVER, ConDropPickup, this, "Drop health/armor/weapon pickup (kind: health|armor|gun|shotgun|grenade|laser|ninja)");
 }
 
 #endif
