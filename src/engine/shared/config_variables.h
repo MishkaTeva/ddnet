@@ -805,3 +805,6 @@ MACRO_CONFIG_INT(SvAnticheatMode, sv_anticheat_mode, 2, 0, 2, CFGFLAG_SERVER, "A
 MACRO_CONFIG_INT(SvAccounts, sv_accounts, 1, 0, 1, CFGFLAG_SERVER, "Enable slim F-DDrace account system")
 MACRO_CONFIG_STR(SvAccFilePath, sv_acc_file_path, 128, "data/accounts", CFGFLAG_SERVER, "Directory for slim account files")
 MACRO_CONFIG_STR(SvWebhookModLogURL, sv_webhook_mod_log_url, 128, "", CFGFLAG_SERVER, "Webhook URL for moderator logging")
+MACRO_CONFIG_INT(SvPortalRadius, sv_portal_radius, 46, 0, 1024, CFGFLAG_SERVER, "Radius of a portal for portal travel")
+MACRO_CONFIG_INT(SvPortalDetonation, sv_portal_detonation, 10, 0, 60, CFGFLAG_SERVER, "Seconds until an unlinked portal detonates")
+MACRO_CONFIG_INT(SvPortalDetonationLinked, sv_portal_detonation_linked, 5, 0, 60, CFGFLAG_SERVER, "Seconds until linked portals detonate")

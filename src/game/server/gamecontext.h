@@ -386,6 +386,8 @@ public:
 	static void ConMuteGagFx(IConsole::IResult *pResult, void *pUserData);
 	static void ConKickBootFx(IConsole::IResult *pResult, void *pUserData);
 	static void ConUnmuteSparkFx(IConsole::IResult *pResult, void *pUserData);
+	static void ConSpawnPortal(IConsole::IResult *pResult, void *pUserData);
+	static void ConClearPortals(IConsole::IResult *pResult, void *pUserData);
 #endif
 	void RegisterDDRaceCommands();
 	void RegisterChatCommands();

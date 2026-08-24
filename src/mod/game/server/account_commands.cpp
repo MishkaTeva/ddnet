@@ -11,6 +11,7 @@
 #include <mod/game/server/entities/kick_boot.h>
 #include <mod/game/server/entities/lovely.h>
 #include <mod/game/server/entities/mute_gag.h>
+#include <mod/game/server/entities/portal.h>
 #include <mod/game/server/entities/rotating_ball.h>
 #include <mod/game/server/entities/staff_ind.h>
 #include <mod/game/server/entities/trail.h>
@@ -250,6 +251,61 @@ void CGameContext::ConUnmuteSparkFx(IConsole::IResult *pResult, void *pUserData)
 	new CUnmuteSpark(&pSelf->m_World, pChr->GetPos(), ClientId);
 }
 
+void CGameContext::ConSpawnPortal(IConsole::IResult *pResult, void *pUserData)
+{
+	CGameContext *pSelf = (CGameContext *)pUserData;
+	const int ClientId = pResult->GetVictim();
+	CPlayer *pPlayer = pSelf->m_apPlayers[ClientId];
+	CCharacter *pChr = pSelf->GetPlayerChar(ClientId);
+	if(!pPlayer || !pChr)
+		return;
+
+	vec2 PortalPos = pChr->GetPos();
+	if(pResult->NumArguments() >= 3)
+		PortalPos = vec2((float)pResult->GetInteger(1), (float)pResult->GetInteger(2));
+
+	if(pPlayer->m_apPortal[PORTAL_FIRST] && pPlayer->m_apPortal[PORTAL_SECOND])
+	{
+		pPlayer->m_apPortal[PORTAL_FIRST]->Reset();
+		if(pPlayer->m_apPortal[PORTAL_SECOND])
+			pPlayer->m_apPortal[PORTAL_SECOND]->Reset();
+		pPlayer->m_apPortal[PORTAL_FIRST] = nullptr;
+		pPlayer->m_apPortal[PORTAL_SECOND] = nullptr;
+	}
+
+	for(int i = 0; i < NUM_PORTALS; i++)
+	{
+		if(pPlayer->m_apPortal[i])
+			continue;
+		pPlayer->m_apPortal[i] = new CPortal(&pSelf->m_World, PortalPos, ClientId);
+		if(i == PORTAL_SECOND && pPlayer->m_apPortal[PORTAL_FIRST])
+		{
+			pPlayer->m_apPortal[PORTAL_FIRST]->SetLinkedPortal(pPlayer->m_apPortal[PORTAL_SECOND]);
+			pPlayer->m_apPortal[PORTAL_SECOND]->SetLinkedPortal(pPlayer->m_apPortal[PORTAL_FIRST]);
+			pSelf->Console()->Print(IConsole::OUTPUT_LEVEL_STANDARD, "portal", "Portals linked");
+		}
+		else
+			pSelf->Console()->Print(IConsole::OUTPUT_LEVEL_STANDARD, "portal", "First portal placed (call again to link)");
+		return;
+	}
+}
+
+void CGameContext::ConClearPortals(IConsole::IResult *pResult, void *pUserData)
+{
+	CGameContext *pSelf = (CGameContext *)pUserData;
+	const int ClientId = pResult->GetVictim();
+	CPlayer *pPlayer = pSelf->m_apPlayers[ClientId];
+	if(!pPlayer)
+		return;
+	for(int i = 0; i < NUM_PORTALS; i++)
+	{
+		if(pPlayer->m_apPortal[i])
+			pPlayer->m_apPortal[i]->Reset();
+		pPlayer->m_apPortal[i] = nullptr;
+	}
+	pSelf->Console()->Print(IConsole::OUTPUT_LEVEL_STANDARD, "portal", "Portals cleared");
+}
+
 void CGameContext::RegisterFddraceAccountCommands()
 {
 	Console()->Register("register", "s[name] s[password] s[password]", CFGFLAG_CHAT | CFGFLAG_SERVER, ConRegister, this, "Register an account");
@@ -272,6 +328,8 @@ void CGameContext::RegisterFddraceAccountCommands()
 	Console()->Register("mute_gag_fx", "v[id]", CFGFLAG_SERVER, ConMuteGagFx, this, "Spawn mute lightning VFX");
 	Console()->Register("kick_boot_fx", "v[id] ?r[reason]", CFGFLAG_SERVER, ConKickBootFx, this, "Spawn kick boot VFX (kicks after animation)");
 	Console()->Register("unmute_spark_fx", "v[id]", CFGFLAG_SERVER, ConUnmuteSparkFx, this, "Spawn unmute spark VFX");
+	Console()->Register("spawn_portal", "v[id] ?i[x] ?i[y]", CFGFLAG_SERVER, ConSpawnPortal, this, "Place/link portal for player (optional x y)");
+	Console()->Register("clear_portals", "v[id]", CFGFLAG_SERVER, ConClearPortals, this, "Clear player portals");
 }
 
 #endif

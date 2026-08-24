@@ -43,6 +43,8 @@ set(FDDRACE_MOD_GAME_SRC
   src/mod/game/server/entities/kick_boot.h
   src/mod/game/server/entities/unmute_spark.cpp
   src/mod/game/server/entities/unmute_spark.h
+  src/mod/game/server/entities/portal.cpp
+  src/mod/game/server/entities/portal.h
 )
 
 set(FDDRACE_MOD_SRC
