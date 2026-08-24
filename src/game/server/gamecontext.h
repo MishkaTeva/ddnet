@@ -365,6 +365,7 @@ public:
 
 	CLaserText *CreateLaserText(vec2 Pos, int Owner, const char *pText, int Seconds = 3, bool AboveTee = true);
 	CMoney *CreateMoney(vec2 Pos, int64_t Amount, int Owner = -1, float Direction = 0, bool GlobalPickupDelay = false);
+	class CFlyingPoint *CreateFlyingPoint(vec2 Pos, int To, int Owner, vec2 InitialVel, vec2 ToPos = vec2(-1, -1));
 
 	static void ConRegister(IConsole::IResult *pResult, void *pUserData);
 	static void ConLogin(IConsole::IResult *pResult, void *pUserData);
@@ -375,6 +376,9 @@ public:
 	static void ConJailRelease(IConsole::IResult *pResult, void *pUserData);
 	static void ConLaserText(IConsole::IResult *pResult, void *pUserData);
 	static void ConDropMoney(IConsole::IResult *pResult, void *pUserData);
+	static void ConToggleLovely(IConsole::IResult *pResult, void *pUserData);
+	static void ConToggleStaffInd(IConsole::IResult *pResult, void *pUserData);
+	static void ConSpawnFlyingPoint(IConsole::IResult *pResult, void *pUserData);
 #endif
 	void RegisterDDRaceCommands();
 	void RegisterChatCommands();

@@ -23,6 +23,12 @@ set(FDDRACE_MOD_GAME_SRC
   src/mod/game/server/entities/jail_arrest.h
   src/mod/game/server/entities/jail_release.cpp
   src/mod/game/server/entities/jail_release.h
+  src/mod/game/server/entities/flyingpoint.cpp
+  src/mod/game/server/entities/flyingpoint.h
+  src/mod/game/server/entities/lovely.cpp
+  src/mod/game/server/entities/lovely.h
+  src/mod/game/server/entities/staff_ind.cpp
+  src/mod/game/server/entities/staff_ind.h
 )
 
 set(FDDRACE_MOD_SRC

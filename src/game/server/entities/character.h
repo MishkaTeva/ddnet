@@ -290,6 +290,11 @@ public:
 
 	CSaveTee &GetLastRescueTeeRef(int Mode = RESCUEMODE_AUTO) { return m_RescueTee[Mode]; }
 	CTuningParams *GetTuning(int Zone) { return &TuningList()[Zone]; }
+
+#ifdef CONF_FDDRACE_MOD
+	bool m_Lovely = false;
+	bool m_StaffInd = false;
+#endif
 };
 
 #endif

@@ -6,6 +6,9 @@
 #include <game/server/gamecontext.h>
 #include <game/server/player.h>
 
+#include <mod/game/server/entities/lovely.h>
+#include <mod/game/server/entities/staff_ind.h>
+
 #ifdef CONF_FDDRACE_MOD
 
 void CGameContext::ConRegister(IConsole::IResult *pResult, void *pUserData)
@@ -120,6 +123,43 @@ void CGameContext::ConDropMoney(IConsole::IResult *pResult, void *pUserData)
 	pSelf->CreateMoney(pPlayer->GetCharacter()->GetPos(), Amount, ClientId, 0.f, true);
 }
 
+void CGameContext::ConToggleLovely(IConsole::IResult *pResult, void *pUserData)
+{
+	CGameContext *pSelf = (CGameContext *)pUserData;
+	const int ClientId = pResult->GetVictim();
+	CCharacter *pChr = pSelf->GetPlayerChar(ClientId);
+	if(!pChr)
+		return;
+	pChr->m_Lovely = !pChr->m_Lovely;
+	if(pChr->m_Lovely)
+		new CLovely(&pSelf->m_World, pChr->GetPos(), ClientId);
+	pSelf->Console()->Print(IConsole::OUTPUT_LEVEL_STANDARD, "cosmetics", pChr->m_Lovely ? "lovely on" : "lovely off");
+}
+
+void CGameContext::ConToggleStaffInd(IConsole::IResult *pResult, void *pUserData)
+{
+	CGameContext *pSelf = (CGameContext *)pUserData;
+	const int ClientId = pResult->GetVictim();
+	CCharacter *pChr = pSelf->GetPlayerChar(ClientId);
+	if(!pChr)
+		return;
+	pChr->m_StaffInd = !pChr->m_StaffInd;
+	if(pChr->m_StaffInd)
+		new CStaffInd(&pSelf->m_World, pChr->GetPos(), ClientId);
+	pSelf->Console()->Print(IConsole::OUTPUT_LEVEL_STANDARD, "cosmetics", pChr->m_StaffInd ? "staff_ind on" : "staff_ind off");
+}
+
+void CGameContext::ConSpawnFlyingPoint(IConsole::IResult *pResult, void *pUserData)
+{
+	CGameContext *pSelf = (CGameContext *)pUserData;
+	const int FromId = pResult->GetVictim();
+	const int ToId = pResult->GetInteger(1);
+	CCharacter *pFrom = pSelf->GetPlayerChar(FromId);
+	if(!pFrom)
+		return;
+	pSelf->CreateFlyingPoint(pFrom->GetPos(), ToId, FromId, vec2(0, -5));
+}
+
 void CGameContext::RegisterFddraceAccountCommands()
 {
 	Console()->Register("register", "s[name] s[password] s[password]", CFGFLAG_CHAT | CFGFLAG_SERVER, ConRegister, this, "Register an account");
@@ -132,6 +172,9 @@ void CGameContext::RegisterFddraceAccountCommands()
 	Console()->Register("jail_release", "v[id]", CFGFLAG_SERVER, ConJailRelease, this, "Release player from jail");
 	Console()->Register("laser_text", "v[id] r[text]", CFGFLAG_SERVER, ConLaserText, this, "Spawn laser text above player");
 	Console()->Register("drop_money", "v[id] i[amount]", CFGFLAG_SERVER, ConDropMoney, this, "Spawn money drop at player");
+	Console()->Register("toggle_lovely", "v[id]", CFGFLAG_SERVER, ConToggleLovely, this, "Toggle lovely hearts cosmetic");
+	Console()->Register("toggle_staff_ind", "v[id]", CFGFLAG_SERVER, ConToggleStaffInd, this, "Toggle staff indicator cosmetic");
+	Console()->Register("spawn_flyingpoint", "v[from] i[to]", CFGFLAG_SERVER, ConSpawnFlyingPoint, this, "Spawn flying point from player to target id");
 }
 
 #endif

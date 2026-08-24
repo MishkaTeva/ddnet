@@ -520,6 +520,7 @@ void CGameContext::CreateSoundGlobal(int Sound, int Target) const
 }
 
 #ifdef CONF_FDDRACE_MOD
+#include <mod/game/server/entities/flyingpoint.h>
 #include <mod/game/server/entities/lasertext.h>
 #include <mod/game/server/entities/money.h>
 
@@ -539,6 +540,11 @@ CMoney *CGameContext::CreateMoney(vec2 Pos, int64_t Amount, int Owner, float Dir
 	if(Amount <= 0)
 		return nullptr;
 	return new CMoney(&m_World, Pos, Amount, Owner, Direction, GlobalPickupDelay);
+}
+
+CFlyingPoint *CGameContext::CreateFlyingPoint(vec2 Pos, int To, int Owner, vec2 InitialVel, vec2 ToPos)
+{
+	return new CFlyingPoint(&m_World, Pos, To, Owner, InitialVel, ToPos);
 }
 #endif
 
