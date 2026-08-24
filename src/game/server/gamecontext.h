@@ -390,6 +390,7 @@ public:
 	static void ConClearPortals(IConsole::IResult *pResult, void *pUserData);
 	static void ConSpawnClock(IConsole::IResult *pResult, void *pUserData);
 	static void ConLightsaber(IConsole::IResult *pResult, void *pUserData);
+	static void ConBanPlungerFx(IConsole::IResult *pResult, void *pUserData);
 #endif
 	void RegisterDDRaceCommands();
 	void RegisterChatCommands();

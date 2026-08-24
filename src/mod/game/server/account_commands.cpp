@@ -7,6 +7,7 @@
 #include <game/server/player.h>
 
 #include <mod/game/server/entities/atom.h>
+#include <mod/game/server/entities/ban_plunger_toilet.h>
 #include <mod/game/server/entities/clock.h>
 #include <mod/game/server/entities/epic_circle.h>
 #include <mod/game/server/entities/kick_boot.h>
@@ -354,6 +355,20 @@ void CGameContext::ConLightsaber(IConsole::IResult *pResult, void *pUserData)
 	}
 }
 
+void CGameContext::ConBanPlungerFx(IConsole::IResult *pResult, void *pUserData)
+{
+	CGameContext *pSelf = (CGameContext *)pUserData;
+	const int ClientId = pResult->GetVictim();
+	CCharacter *pChr = pSelf->GetPlayerChar(ClientId);
+	if(!pChr)
+		return;
+	const int Seconds = pResult->NumArguments() > 1 ? pResult->GetInteger(1) : 60;
+	const char *pReason = pResult->NumArguments() > 2 ? pResult->GetString(2) : "Banned";
+	vec2 AirPos = pChr->GetPos();
+	CBanPlungerToilet::FindPos(pSelf, pChr->GetPos(), &AirPos);
+	new CBanPlungerToilet(&pSelf->m_World, AirPos, ClientId, Seconds, pReason);
+}
+
 void CGameContext::RegisterFddraceAccountCommands()
 {
 	Console()->Register("register", "s[name] s[password] s[password]", CFGFLAG_CHAT | CFGFLAG_SERVER, ConRegister, this, "Register an account");
@@ -380,6 +395,7 @@ void CGameContext::RegisterFddraceAccountCommands()
 	Console()->Register("clear_portals", "v[id]", CFGFLAG_SERVER, ConClearPortals, this, "Clear player portals");
 	Console()->Register("spawn_clock", "v[id] ?i[x] ?i[y]", CFGFLAG_SERVER, ConSpawnClock, this, "Spawn analog clock above player");
 	Console()->Register("lightsaber", "v[id] ?s[extend|retract|toggle]", CFGFLAG_SERVER, ConLightsaber, this, "Extend/retract lightsaber for player");
+	Console()->Register("ban_plunger_fx", "v[id] ?i[seconds] ?r[reason]", CFGFLAG_SERVER, ConBanPlungerFx, this, "Spawn ban plunger VFX (bans after animation)");
 }
 
 #endif

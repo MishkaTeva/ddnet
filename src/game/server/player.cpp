@@ -94,6 +94,7 @@ void CPlayer::Reset()
 	m_MuteGag = false;
 	m_KickBoot = false;
 	m_UnmuteSpark = false;
+	m_BanPlungerToilet = false;
 	m_apPortal[0] = nullptr;
 	m_apPortal[1] = nullptr;
 #endif

@@ -278,8 +278,10 @@ public:
 	bool m_MuteGag = false;
 	bool m_KickBoot = false;
 	bool m_UnmuteSpark = false;
+	bool m_BanPlungerToilet = false;
 	class CPortal *m_apPortal[2] = {};
 	int GetAccID() const;
 #endif
 };
+
 #endif

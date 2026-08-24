@@ -49,6 +49,8 @@ set(FDDRACE_MOD_GAME_SRC
   src/mod/game/server/entities/clock.h
   src/mod/game/server/entities/lightsaber.cpp
   src/mod/game/server/entities/lightsaber.h
+  src/mod/game/server/entities/ban_plunger_toilet.cpp
+  src/mod/game/server/entities/ban_plunger_toilet.h
 )
 
 set(FDDRACE_MOD_SRC
