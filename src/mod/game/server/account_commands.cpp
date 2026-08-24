@@ -8,10 +8,13 @@
 
 #include <mod/game/server/entities/atom.h>
 #include <mod/game/server/entities/epic_circle.h>
+#include <mod/game/server/entities/kick_boot.h>
 #include <mod/game/server/entities/lovely.h>
+#include <mod/game/server/entities/mute_gag.h>
 #include <mod/game/server/entities/rotating_ball.h>
 #include <mod/game/server/entities/staff_ind.h>
 #include <mod/game/server/entities/trail.h>
+#include <mod/game/server/entities/unmute_spark.h>
 
 #ifdef CONF_FDDRACE_MOD
 
@@ -216,6 +219,37 @@ void CGameContext::ConToggleEpicCircle(IConsole::IResult *pResult, void *pUserDa
 	pSelf->Console()->Print(IConsole::OUTPUT_LEVEL_STANDARD, "cosmetics", pChr->m_EpicCircle ? "epic_circle on" : "epic_circle off");
 }
 
+void CGameContext::ConMuteGagFx(IConsole::IResult *pResult, void *pUserData)
+{
+	CGameContext *pSelf = (CGameContext *)pUserData;
+	const int ClientId = pResult->GetVictim();
+	CCharacter *pChr = pSelf->GetPlayerChar(ClientId);
+	if(!pChr)
+		return;
+	new CMuteGag(&pSelf->m_World, pChr->GetPos(), ClientId);
+}
+
+void CGameContext::ConKickBootFx(IConsole::IResult *pResult, void *pUserData)
+{
+	CGameContext *pSelf = (CGameContext *)pUserData;
+	const int ClientId = pResult->GetVictim();
+	CCharacter *pChr = pSelf->GetPlayerChar(ClientId);
+	if(!pChr)
+		return;
+	const char *pReason = pResult->NumArguments() > 1 ? pResult->GetString(1) : "Kicked";
+	new CKickBoot(&pSelf->m_World, pChr->GetPos(), ClientId, pReason);
+}
+
+void CGameContext::ConUnmuteSparkFx(IConsole::IResult *pResult, void *pUserData)
+{
+	CGameContext *pSelf = (CGameContext *)pUserData;
+	const int ClientId = pResult->GetVictim();
+	CCharacter *pChr = pSelf->GetPlayerChar(ClientId);
+	if(!pChr)
+		return;
+	new CUnmuteSpark(&pSelf->m_World, pChr->GetPos(), ClientId);
+}
+
 void CGameContext::RegisterFddraceAccountCommands()
 {
 	Console()->Register("register", "s[name] s[password] s[password]", CFGFLAG_CHAT | CFGFLAG_SERVER, ConRegister, this, "Register an account");
@@ -235,6 +269,9 @@ void CGameContext::RegisterFddraceAccountCommands()
 	Console()->Register("toggle_atom", "v[id]", CFGFLAG_SERVER, ConToggleAtom, this, "Toggle atom cosmetic");
 	Console()->Register("toggle_trail", "v[id]", CFGFLAG_SERVER, ConToggleTrail, this, "Toggle trail cosmetic");
 	Console()->Register("toggle_epic_circle", "v[id]", CFGFLAG_SERVER, ConToggleEpicCircle, this, "Toggle epic circle cosmetic");
+	Console()->Register("mute_gag_fx", "v[id]", CFGFLAG_SERVER, ConMuteGagFx, this, "Spawn mute lightning VFX");
+	Console()->Register("kick_boot_fx", "v[id] ?r[reason]", CFGFLAG_SERVER, ConKickBootFx, this, "Spawn kick boot VFX (kicks after animation)");
+	Console()->Register("unmute_spark_fx", "v[id]", CFGFLAG_SERVER, ConUnmuteSparkFx, this, "Spawn unmute spark VFX");
 }
 
 #endif

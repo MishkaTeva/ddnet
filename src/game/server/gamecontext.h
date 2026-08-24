@@ -383,6 +383,9 @@ public:
 	static void ConToggleAtom(IConsole::IResult *pResult, void *pUserData);
 	static void ConToggleTrail(IConsole::IResult *pResult, void *pUserData);
 	static void ConToggleEpicCircle(IConsole::IResult *pResult, void *pUserData);
+	static void ConMuteGagFx(IConsole::IResult *pResult, void *pUserData);
+	static void ConKickBootFx(IConsole::IResult *pResult, void *pUserData);
+	static void ConUnmuteSparkFx(IConsole::IResult *pResult, void *pUserData);
 #endif
 	void RegisterDDRaceCommands();
 	void RegisterChatCommands();

@@ -37,6 +37,12 @@ set(FDDRACE_MOD_GAME_SRC
   src/mod/game/server/entities/trail.h
   src/mod/game/server/entities/epic_circle.cpp
   src/mod/game/server/entities/epic_circle.h
+  src/mod/game/server/entities/mute_gag.cpp
+  src/mod/game/server/entities/mute_gag.h
+  src/mod/game/server/entities/kick_boot.cpp
+  src/mod/game/server/entities/kick_boot.h
+  src/mod/game/server/entities/unmute_spark.cpp
+  src/mod/game/server/entities/unmute_spark.h
 )
 
 set(FDDRACE_MOD_SRC

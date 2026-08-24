@@ -91,6 +91,9 @@ void CPlayer::Reset()
 	m_JailTime = 0;
 	m_JailArresting = false;
 	m_JailReleasing = false;
+	m_MuteGag = false;
+	m_KickBoot = false;
+	m_UnmuteSpark = false;
 #endif
 
 	m_SendVoteIndex = -1;

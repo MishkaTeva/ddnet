@@ -275,6 +275,9 @@ public:
 	int64_t m_JailTime = 0;
 	bool m_JailArresting = false;
 	bool m_JailReleasing = false;
+	bool m_MuteGag = false;
+	bool m_KickBoot = false;
+	bool m_UnmuteSpark = false;
 	int GetAccID() const;
 #endif
 };
