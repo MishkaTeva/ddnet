@@ -17,6 +17,7 @@
 #include <mod/game/server/entities/portal.h>
 #include <mod/game/server/entities/rotating_ball.h>
 #include <mod/game/server/entities/staff_ind.h>
+#include <mod/game/server/entities/stable_projectile.h>
 #include <mod/game/server/entities/trail.h>
 #include <mod/game/server/entities/unmute_spark.h>
 
@@ -369,6 +370,23 @@ void CGameContext::ConBanPlungerFx(IConsole::IResult *pResult, void *pUserData)
 	new CBanPlungerToilet(&pSelf->m_World, AirPos, ClientId, Seconds, pReason);
 }
 
+void CGameContext::ConSpawnStableProjectile(IConsole::IResult *pResult, void *pUserData)
+{
+	CGameContext *pSelf = (CGameContext *)pUserData;
+	const int ClientId = pResult->GetVictim();
+	CCharacter *pChr = pSelf->GetPlayerChar(ClientId);
+	if(!pChr)
+		return;
+	int Type = pResult->NumArguments() > 1 ? pResult->GetInteger(1) : WEAPON_GRENADE;
+	if(Type < WEAPON_GUN || Type > WEAPON_NINJA)
+		Type = WEAPON_GRENADE;
+	vec2 Pos = pChr->GetPos() + vec2(0.f, -40.f);
+	if(pResult->NumArguments() >= 4)
+		Pos = vec2((float)pResult->GetInteger(2), (float)pResult->GetInteger(3));
+	new CStableProjectile(&pSelf->m_World, Type, ClientId, Pos);
+	pSelf->Console()->Print(IConsole::OUTPUT_LEVEL_STANDARD, "stable_projectile", "Spawned");
+}
+
 void CGameContext::RegisterFddraceAccountCommands()
 {
 	Console()->Register("register", "s[name] s[password] s[password]", CFGFLAG_CHAT | CFGFLAG_SERVER, ConRegister, this, "Register an account");
@@ -396,6 +414,7 @@ void CGameContext::RegisterFddraceAccountCommands()
 	Console()->Register("spawn_clock", "v[id] ?i[x] ?i[y]", CFGFLAG_SERVER, ConSpawnClock, this, "Spawn analog clock above player");
 	Console()->Register("lightsaber", "v[id] ?s[extend|retract|toggle]", CFGFLAG_SERVER, ConLightsaber, this, "Extend/retract lightsaber for player");
 	Console()->Register("ban_plunger_fx", "v[id] ?i[seconds] ?r[reason]", CFGFLAG_SERVER, ConBanPlungerFx, this, "Spawn ban plunger VFX (bans after animation)");
+	Console()->Register("spawn_stable_projectile", "v[id] ?i[type] ?i[x] ?i[y]", CFGFLAG_SERVER, ConSpawnStableProjectile, this, "Spawn stable projectile (type: gun/shotgun/grenade ids)");
 }
 
 #endif

@@ -391,6 +391,7 @@ public:
 	static void ConSpawnClock(IConsole::IResult *pResult, void *pUserData);
 	static void ConLightsaber(IConsole::IResult *pResult, void *pUserData);
 	static void ConBanPlungerFx(IConsole::IResult *pResult, void *pUserData);
+	static void ConSpawnStableProjectile(IConsole::IResult *pResult, void *pUserData);
 #endif
 	void RegisterDDRaceCommands();
 	void RegisterChatCommands();
