@@ -1641,7 +1641,11 @@ void CCharacter::HandleTiles(int Index)
 	int MapIndex = Index;
 	m_TileIndex = Collision()->GetTileIndex(MapIndex);
 	m_TileFIndex = Collision()->GetFrontTileIndex(MapIndex);
+#ifdef CONF_FDDRACE_MOD
+	m_MoveRestrictions = Collision()->GetMoveRestrictions(IsSwitchActiveCb, this, m_Pos, 18.0f, MapIndex, m_Core.m_MoveRestrictionExtra);
+#else
 	m_MoveRestrictions = Collision()->GetMoveRestrictions(IsSwitchActiveCb, this, m_Pos, 18.0f, MapIndex);
+#endif
 	if(Index < 0)
 	{
 		m_LastRefillJumps = false;

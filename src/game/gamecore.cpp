@@ -188,6 +188,10 @@ void CCharacterCore::Reset()
 	m_DeepFrozen = false;
 	m_LiveFrozen = false;
 
+#ifdef CONF_FDDRACE_MOD
+	m_MoveRestrictionExtra = {};
+#endif
+
 	// never initialize both to 0
 	m_Input.m_TargetX = 0;
 	m_Input.m_TargetY = -1;
@@ -195,7 +199,11 @@ void CCharacterCore::Reset()
 
 void CCharacterCore::Tick(bool UseInput, bool DoDeferredTick)
 {
+#ifdef CONF_FDDRACE_MOD
+	m_MoveRestrictions = m_pCollision->GetMoveRestrictions(UseInput ? IsSwitchActiveCb : nullptr, this, m_Pos, 18.0f, -1, m_MoveRestrictionExtra);
+#else
 	m_MoveRestrictions = m_pCollision->GetMoveRestrictions(UseInput ? IsSwitchActiveCb : nullptr, this, m_Pos);
+#endif
 	m_TriggeredEvents = 0;
 
 	// get ground state
@@ -411,7 +419,12 @@ void CCharacterCore::Tick(bool UseInput, bool DoDeferredTick)
 
 	if(m_HookState == HOOK_GRABBED)
 	{
-		if(m_HookedPlayer != -1 && m_pWorld)
+#ifdef CONF_FDDRACE_MOD
+		const bool HookedFlag = m_HookedPlayer == HOOK_FLAG_RED || m_HookedPlayer == HOOK_FLAG_BLUE;
+#else
+		const bool HookedFlag = false;
+#endif
+		if(m_HookedPlayer != -1 && m_pWorld && !HookedFlag)
 		{
 			CCharacterCore *pCharCore = m_pWorld->m_apCharacters[m_HookedPlayer];
 			if(pCharCore && m_Id != -1 && m_pTeams->CanKeepHook(m_Id, pCharCore->m_Id))
@@ -451,7 +464,7 @@ void CCharacterCore::Tick(bool UseInput, bool DoDeferredTick)
 
 		// release hook (max default hook time is 1.25 s)
 		m_HookTick++;
-		if(m_HookedPlayer != -1 && (m_HookTick > SERVER_TICK_SPEED + SERVER_TICK_SPEED / 5 || (m_pWorld && !m_pWorld->m_apCharacters[m_HookedPlayer])))
+		if(m_HookedPlayer != -1 && !HookedFlag && (m_HookTick > SERVER_TICK_SPEED + SERVER_TICK_SPEED / 5 || (m_pWorld && !m_pWorld->m_apCharacters[m_HookedPlayer])))
 		{
 			SetHookedPlayer(-1);
 			m_HookState = HOOK_RETRACTED;
@@ -620,7 +633,12 @@ void CCharacterCore::Write(CNetObj_CharacterCore *pObjCore) const
 	pObjCore->m_HookY = round_to_int(m_HookPos.y);
 	pObjCore->m_HookDx = round_to_int(m_HookDir.x * 256.0f);
 	pObjCore->m_HookDy = round_to_int(m_HookDir.y * 256.0f);
+#ifdef CONF_FDDRACE_MOD
+	// Never snap flag sentinels — clients expect a real ClientId or -1.
+	pObjCore->m_HookedPlayer = (m_HookedPlayer == HOOK_FLAG_RED || m_HookedPlayer == HOOK_FLAG_BLUE) ? -1 : m_HookedPlayer;
+#else
 	pObjCore->m_HookedPlayer = m_HookedPlayer;
+#endif
 	pObjCore->m_Jumped = m_Jumped;
 	pObjCore->m_Direction = m_Direction;
 	pObjCore->m_Angle = m_Angle;
@@ -709,6 +727,20 @@ void CCharacterCore::Quantize()
 
 void CCharacterCore::SetHookedPlayer(int HookedPlayer)
 {
+#ifdef CONF_FDDRACE_MOD
+	// Flag sentinels are not character slots — never index m_apCharacters with them.
+	if(HookedPlayer == HOOK_FLAG_RED || HookedPlayer == HOOK_FLAG_BLUE)
+	{
+		if(m_HookedPlayer != -1 && m_HookedPlayer != HOOK_FLAG_RED && m_HookedPlayer != HOOK_FLAG_BLUE && m_Id != -1 && m_pWorld)
+		{
+			CCharacterCore *pCharCore = m_pWorld->m_apCharacters[m_HookedPlayer];
+			if(pCharCore)
+				pCharCore->m_AttachedPlayers.erase(m_Id);
+		}
+		m_HookedPlayer = HookedPlayer;
+		return;
+	}
+#endif
 	if(HookedPlayer != m_HookedPlayer)
 	{
 		if(m_HookedPlayer != -1 && m_Id != -1 && m_pWorld)

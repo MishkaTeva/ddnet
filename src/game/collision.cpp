@@ -306,7 +306,12 @@ static int GetMoveRestrictions(int Direction, int Tile, int Flags)
 	return Result & GetMoveRestrictionsMask(Direction);
 }
 
-int CCollision::GetMoveRestrictions(CALLBACK_SWITCHACTIVE pfnSwitchActive, void *pUser, vec2 Pos, float Distance, int OverrideCenterTileIndex) const
+int CCollision::GetMoveRestrictions(CALLBACK_SWITCHACTIVE pfnSwitchActive, void *pUser, vec2 Pos, float Distance, int OverrideCenterTileIndex
+#ifdef CONF_FDDRACE_MOD
+	,
+	MoveRestrictionExtra Extra
+#endif
+) const
 {
 	static const vec2 DIRECTIONS[NUM_MR_DIRS] =
 		{
@@ -340,6 +345,17 @@ int CCollision::GetMoveRestrictions(CALLBACK_SWITCHACTIVE pfnSwitchActive, void 
 				Flags = GetFrontTileFlags(ModMapIndex);
 			}
 			Restrictions |= ::GetMoveRestrictions(d, Tile, Flags);
+#ifdef CONF_FDDRACE_MOD
+			// Room / VIP+ tiles act as full stoppers until Phase 5 unlocks Extra flags.
+			if(Tile == TILE_ROOM && !Extra.m_RoomKey)
+			{
+				Restrictions |= CANTMOVE_LEFT | CANTMOVE_RIGHT | CANTMOVE_UP | CANTMOVE_DOWN | CANTMOVE_ROOM;
+			}
+			else if(Tile == TILE_VIP_PLUS_ONLY && !Extra.m_VipPlus)
+			{
+				Restrictions |= CANTMOVE_LEFT | CANTMOVE_RIGHT | CANTMOVE_UP | CANTMOVE_DOWN | CANTMOVE_VIP_PLUS_ONLY;
+			}
+#endif
 		}
 		if(pfnSwitchActive)
 		{
@@ -349,7 +365,14 @@ int CCollision::GetMoveRestrictions(CALLBACK_SWITCHACTIVE pfnSwitchActive, void 
 				DoorTile.m_Number < 256 &&
 				pfnSwitchActive(DoorTile.m_Number, pUser))
 			{
-				Restrictions |= ::GetMoveRestrictions(d, DoorTile.m_Index, DoorTile.m_Flags);
+				const int DoorRestrictions = ::GetMoveRestrictions(d, DoorTile.m_Index, DoorTile.m_Flags);
+				Restrictions |= DoorRestrictions;
+#ifdef CONF_FDDRACE_MOD
+				if(DoorRestrictions && IsPlotDoor(DoorTile.m_Number))
+					Restrictions |= CANTMOVE_PLOT_DOOR;
+				if(DoorRestrictions & CANTMOVE_DOWN)
+					Restrictions |= CANTMOVE_DOWN_LASERDOOR;
+#endif
 			}
 		}
 	}

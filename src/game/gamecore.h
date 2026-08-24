@@ -72,6 +72,8 @@ public:
 	static const CTuningParams DEFAULT;
 };
 
+#include "gamecore_mod.h"
+
 // Do not use these function unless for legacy code!
 void StrToInts(int *pInts, size_t NumInts, const char *pStr);
 bool IntsToStr(const int *pInts, size_t NumInts, char *pStr, size_t StrSize);
@@ -275,6 +277,11 @@ public:
 	bool m_DeepFrozen;
 	bool m_LiveFrozen;
 	CTuningParams m_Tuning;
+
+#ifdef CONF_FDDRACE_MOD
+	// Defaults deny room/VIP+ until Phase 5 wires accounts / room keys.
+	MoveRestrictionExtra m_MoveRestrictionExtra;
+#endif
 
 	// clientside only: antiping
 	void SetAntiPingInterfereCallback(FAntiPingInterfereCallback Callback);

@@ -26,6 +26,8 @@ enum
 	CANTMOVE_DOWN = 1 << 3,
 };
 
+#include "collision_mod.h"
+
 vec2 ClampVel(int MoveRestriction, vec2 Vel);
 
 typedef bool (*CALLBACK_SWITCHACTIVE)(unsigned char Number, void *pUser);
@@ -66,10 +68,24 @@ public:
 	int GetIndex(vec2 PrevPos, vec2 Pos) const;
 	int GetFrontIndex(int x, int y) const;
 
-	int GetMoveRestrictions(CALLBACK_SWITCHACTIVE pfnSwitchActive, void *pUser, vec2 Pos, float Distance = 18.0f, int OverrideCenterTileIndex = -1) const;
-	int GetMoveRestrictions(vec2 Pos, float Distance = 18.0f) const
+	int GetMoveRestrictions(CALLBACK_SWITCHACTIVE pfnSwitchActive, void *pUser, vec2 Pos, float Distance = 18.0f, int OverrideCenterTileIndex = -1
+#ifdef CONF_FDDRACE_MOD
+		,
+		MoveRestrictionExtra Extra = {}
+#endif
+	) const;
+	int GetMoveRestrictions(vec2 Pos, float Distance = 18.0f
+#ifdef CONF_FDDRACE_MOD
+		,
+		MoveRestrictionExtra Extra = {}
+#endif
+	) const
 	{
+#ifdef CONF_FDDRACE_MOD
+		return GetMoveRestrictions(nullptr, nullptr, Pos, Distance, -1, Extra);
+#else
 		return GetMoveRestrictions(nullptr, nullptr, Pos, Distance);
+#endif
 	}
 
 	int GetTile(int x, int y) const;
