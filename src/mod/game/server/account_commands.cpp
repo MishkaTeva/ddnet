@@ -10,6 +10,7 @@
 #include <mod/game/server/entities/clock.h>
 #include <mod/game/server/entities/epic_circle.h>
 #include <mod/game/server/entities/kick_boot.h>
+#include <mod/game/server/entities/lightsaber.h>
 #include <mod/game/server/entities/lovely.h>
 #include <mod/game/server/entities/mute_gag.h>
 #include <mod/game/server/entities/portal.h>
@@ -321,6 +322,38 @@ void CGameContext::ConSpawnClock(IConsole::IResult *pResult, void *pUserData)
 	pSelf->Console()->Print(IConsole::OUTPUT_LEVEL_STANDARD, "clock", "Clock spawned");
 }
 
+void CGameContext::ConLightsaber(IConsole::IResult *pResult, void *pUserData)
+{
+	CGameContext *pSelf = (CGameContext *)pUserData;
+	const int ClientId = pResult->GetVictim();
+	CCharacter *pChr = pSelf->GetPlayerChar(ClientId);
+	if(!pChr)
+		return;
+
+	const char *pAction = pResult->NumArguments() > 1 ? pResult->GetString(1) : "toggle";
+	if(!str_comp_nocase(pAction, "retract"))
+	{
+		if(pChr->m_pLightsaber)
+			pChr->m_pLightsaber->Retract();
+		return;
+	}
+
+	if(!pChr->m_pLightsaber)
+	{
+		pChr->m_pLightsaber = new CLightsaber(&pSelf->m_World, pChr->GetPos(), ClientId);
+		pChr->m_pLightsaber->Extend();
+		pSelf->Console()->Print(IConsole::OUTPUT_LEVEL_STANDARD, "lightsaber", "extended");
+	}
+	else if(!str_comp_nocase(pAction, "extend"))
+	{
+		pChr->m_pLightsaber->Extend();
+	}
+	else
+	{
+		pChr->m_pLightsaber->Retract();
+	}
+}
+
 void CGameContext::RegisterFddraceAccountCommands()
 {
 	Console()->Register("register", "s[name] s[password] s[password]", CFGFLAG_CHAT | CFGFLAG_SERVER, ConRegister, this, "Register an account");
@@ -346,6 +379,7 @@ void CGameContext::RegisterFddraceAccountCommands()
 	Console()->Register("spawn_portal", "v[id] ?i[x] ?i[y]", CFGFLAG_SERVER, ConSpawnPortal, this, "Place/link portal for player (optional x y)");
 	Console()->Register("clear_portals", "v[id]", CFGFLAG_SERVER, ConClearPortals, this, "Clear player portals");
 	Console()->Register("spawn_clock", "v[id] ?i[x] ?i[y]", CFGFLAG_SERVER, ConSpawnClock, this, "Spawn analog clock above player");
+	Console()->Register("lightsaber", "v[id] ?s[extend|retract|toggle]", CFGFLAG_SERVER, ConLightsaber, this, "Extend/retract lightsaber for player");
 }
 
 #endif

@@ -298,6 +298,7 @@ public:
 	bool m_Atom = false;
 	bool m_Trail = false;
 	bool m_EpicCircle = false;
+	class CLightsaber *m_pLightsaber = nullptr;
 #endif
 };
 

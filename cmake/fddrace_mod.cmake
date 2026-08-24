@@ -47,6 +47,8 @@ set(FDDRACE_MOD_GAME_SRC
   src/mod/game/server/entities/portal.h
   src/mod/game/server/entities/clock.cpp
   src/mod/game/server/entities/clock.h
+  src/mod/game/server/entities/lightsaber.cpp
+  src/mod/game/server/entities/lightsaber.h
 )
 
 set(FDDRACE_MOD_SRC
