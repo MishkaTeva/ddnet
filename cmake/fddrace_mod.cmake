@@ -13,6 +13,7 @@ set(FDDRACE_MOD_GAME_SRC
   src/mod/game/server/account.cpp
   src/mod/game/server/account.h
   src/mod/game/server/account_commands.cpp
+  src/mod/game/server/grog_character.cpp
   src/mod/game/server/versioncheck.cpp
   src/mod/game/server/versioncheck.h
   src/mod/game/server/entities/lasertext.cpp
@@ -67,6 +68,10 @@ set(FDDRACE_MOD_GAME_SRC
   src/mod/game/server/entities/taser_shield.h
   src/mod/game/server/entities/portalblocker.cpp
   src/mod/game/server/entities/portalblocker.h
+  src/mod/game/server/entities/lightninglaser.cpp
+  src/mod/game/server/entities/lightninglaser.h
+  src/mod/game/server/entities/grog.cpp
+  src/mod/game/server/entities/grog.h
 )
 
 set(FDDRACE_MOD_SRC

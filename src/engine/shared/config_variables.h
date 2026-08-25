@@ -813,3 +813,4 @@ MACRO_CONFIG_INT(SvLightTeleporters, sv_light_teleporters, 1, 0, 1, CFGFLAG_SERV
 MACRO_CONFIG_INT(SvPortalBlockerDetonation, sv_portal_blocker_detonation, 30, 1, 600, CFGFLAG_SERVER, "Seconds until a placed portal blocker detonates")
 MACRO_CONFIG_INT(SvPortalBlockerMaxLength, sv_portal_blocker_max_length, 20, 0, 1000, CFGFLAG_SERVER, "Max portal blocker length in tiles (0 = unlimited)")
 MACRO_CONFIG_INT(SvPortalMaxDistance, sv_portal_max_distance, 1000, 0, 10000, CFGFLAG_SERVER, "Max distance to place portals / portal blockers")
+MACRO_CONFIG_INT(SvGrogHoldLimit, sv_grog_hold_limit, 3, 1, 10, CFGFLAG_SERVER, "Amount of grogs a player can carry")

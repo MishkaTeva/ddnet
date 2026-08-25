@@ -302,6 +302,13 @@ public:
 	bool m_IsPortalBlocker = false;
 	class CPortalBlocker *m_pPortalBlocker = nullptr;
 	class CLightsaber *m_pLightsaber = nullptr;
+	class CGrog *m_pGrog = nullptr;
+	int m_NumGrogsHolding = 0;
+	int m_LastGrogHoldMsg = 0;
+
+	int GetAimDir() const { return m_Input.m_TargetX < 0 ? -1 : 1; }
+	bool AddGrog();
+	void IncreasePermille(int Permille);
 #endif
 };
 

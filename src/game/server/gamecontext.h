@@ -401,6 +401,10 @@ public:
 	static void ConUpdatePlayerCounter(IConsole::IResult *pResult, void *pUserData);
 	static void ConTaserShieldFx(IConsole::IResult *pResult, void *pUserData);
 	static void ConPortalBlocker(IConsole::IResult *pResult, void *pUserData);
+	static void ConLightningLaser(IConsole::IResult *pResult, void *pUserData);
+	static void ConGiveGrog(IConsole::IResult *pResult, void *pUserData);
+	static void ConGrogSip(IConsole::IResult *pResult, void *pUserData);
+	static void ConGrogDrop(IConsole::IResult *pResult, void *pUserData);
 #endif
 	void RegisterDDRaceCommands();
 	void RegisterChatCommands();

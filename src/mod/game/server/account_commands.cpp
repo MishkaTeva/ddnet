@@ -13,8 +13,10 @@
 #include <mod/game/server/entities/clock.h>
 #include <mod/game/server/entities/custom_projectile.h>
 #include <mod/game/server/entities/epic_circle.h>
+#include <mod/game/server/entities/grog.h>
 #include <mod/game/server/entities/kick_boot.h>
 #include <mod/game/server/entities/lightsaber.h>
+#include <mod/game/server/entities/lightninglaser.h>
 #include <mod/game/server/entities/lovely.h>
 #include <mod/game/server/entities/meteor.h>
 #include <mod/game/server/entities/mute_gag.h>
@@ -597,6 +599,55 @@ void CGameContext::ConPortalBlocker(IConsole::IResult *pResult, void *pUserData)
 	pSelf->Console()->Print(IConsole::OUTPUT_LEVEL_STANDARD, "portalblocker", "Preview started; use portal_blocker <id> place twice");
 }
 
+void CGameContext::ConLightningLaser(IConsole::IResult *pResult, void *pUserData)
+{
+	CGameContext *pSelf = (CGameContext *)pUserData;
+	const int ClientId = pResult->GetVictim();
+	CCharacter *pChr = pSelf->GetPlayerChar(ClientId);
+	if(!pChr)
+		return;
+
+	float Angle = pChr->Core()->m_Angle / 256.0f;
+	vec2 Dir = vec2(cosf(Angle), sinf(Angle));
+	if(length(Dir) < 0.001f)
+		Dir = vec2(1.f, 0.f);
+	new CLightningLaser(&pSelf->m_World, pChr->GetPos(), Dir, ClientId);
+	pSelf->Console()->Print(IConsole::OUTPUT_LEVEL_STANDARD, "lightning_laser", "Spawned");
+}
+
+void CGameContext::ConGiveGrog(IConsole::IResult *pResult, void *pUserData)
+{
+	CGameContext *pSelf = (CGameContext *)pUserData;
+	const int ClientId = pResult->GetVictim();
+	CCharacter *pChr = pSelf->GetPlayerChar(ClientId);
+	if(!pChr)
+		return;
+	if(!pChr->AddGrog())
+		pSelf->Console()->Print(IConsole::OUTPUT_LEVEL_STANDARD, "grog", "Failed (hold limit?)");
+	else
+		pSelf->Console()->Print(IConsole::OUTPUT_LEVEL_STANDARD, "grog", "Given");
+}
+
+void CGameContext::ConGrogSip(IConsole::IResult *pResult, void *pUserData)
+{
+	CGameContext *pSelf = (CGameContext *)pUserData;
+	const int ClientId = pResult->GetVictim();
+	CCharacter *pChr = pSelf->GetPlayerChar(ClientId);
+	if(!pChr || !pChr->m_pGrog)
+		return;
+	pChr->m_pGrog->OnSip();
+}
+
+void CGameContext::ConGrogDrop(IConsole::IResult *pResult, void *pUserData)
+{
+	CGameContext *pSelf = (CGameContext *)pUserData;
+	const int ClientId = pResult->GetVictim();
+	CCharacter *pChr = pSelf->GetPlayerChar(ClientId);
+	if(!pChr || !pChr->m_pGrog)
+		return;
+	pChr->m_pGrog->Drop();
+}
+
 void CGameContext::RegisterFddraceAccountCommands()
 {
 	Console()->Register("register", "s[name] s[password] s[password]", CFGFLAG_CHAT | CFGFLAG_SERVER, ConRegister, this, "Register an account");
@@ -634,6 +685,10 @@ void CGameContext::RegisterFddraceAccountCommands()
 	Console()->Register("update_playercounter", "i[port] i[count]", CFGFLAG_SERVER, ConUpdatePlayerCounter, this, "Update player counters for a port");
 	Console()->Register("taser_shield_fx", "v[id]", CFGFLAG_SERVER, ConTaserShieldFx, this, "Spawn taser shield armor VFX on player");
 	Console()->Register("portal_blocker", "v[id] ?s[start|place]", CFGFLAG_SERVER, ConPortalBlocker, this, "Start portal blocker preview or place endpoint");
+	Console()->Register("lightning_laser", "v[id]", CFGFLAG_SERVER, ConLightningLaser, this, "Fire lightning laser from player aim");
+	Console()->Register("give_grog", "v[id]", CFGFLAG_SERVER, ConGiveGrog, this, "Give grog to player");
+	Console()->Register("grog_sip", "v[id]", CFGFLAG_SERVER, ConGrogSip, this, "Take a sip from held grog");
+	Console()->Register("grog_drop", "v[id]", CFGFLAG_SERVER, ConGrogDrop, this, "Drop held grog");
 }
 
 #endif
