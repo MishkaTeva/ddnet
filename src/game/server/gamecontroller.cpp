@@ -21,6 +21,13 @@
 #include <game/server/score.h>
 #include <game/teamscore.h>
 
+#ifdef CONF_FDDRACE_MOD
+#include <mod/game/server/entities/flag.h>
+#include <mod/game/server/minigames/arenas.h>
+#include <mod/game/server/minigames/durak.h>
+#include <mod/game/server/minigames/minigame.h>
+#endif
+
 IGameController::IGameController(class CGameContext *pGameServer) :
 	m_Teams(pGameServer), m_pLoadBestTimeResult(nullptr)
 {
@@ -201,6 +208,14 @@ bool IGameController::OnEntity(int Index, int x, int y, int Layer, int Flags, bo
 		const int SpawnType = Index - ENTITY_SPAWN;
 		m_avSpawnPoints[SpawnType].push_back(Pos);
 	}
+#ifdef CONF_FDDRACE_MOD
+	else if((Index == ENTITY_FLAGSTAND_RED || Index == ENTITY_FLAGSTAND_BLUE) && Initial)
+	{
+		const int Team = Index == ENTITY_FLAGSTAND_RED ? TEAM_RED : TEAM_BLUE;
+		if(!GameServer()->m_apFlags[Team])
+			new CFlag(&GameServer()->m_World, Team, Pos);
+	}
+#endif
 	else if(Index == ENTITY_DOOR)
 	{
 		for(int i = 0; i < 8; i++)
@@ -517,9 +532,42 @@ void IGameController::OnCharacterSpawn(class CCharacter *pChr)
 	// default health
 	pChr->IncreaseHealth(10);
 
+#ifdef CONF_FDDRACE_MOD
+	switch(pChr->GetPlayer()->m_Minigame)
+	{
+	case MINIGAME_SURVIVAL:
+		pChr->GiveWeapon(WEAPON_HAMMER);
+		pChr->SetActiveWeapon(WEAPON_HAMMER);
+		break;
+	case MINIGAME_INSTAGIB_BOOMFNG:
+		pChr->GiveWeapon(WEAPON_HAMMER);
+		pChr->GiveWeapon(WEAPON_GRENADE);
+		pChr->SetActiveWeapon(WEAPON_GRENADE);
+		break;
+	case MINIGAME_INSTAGIB_FNG:
+		pChr->GiveWeapon(WEAPON_HAMMER);
+		pChr->GiveWeapon(WEAPON_LASER);
+		pChr->SetActiveWeapon(WEAPON_LASER);
+		break;
+	case MINIGAME_1VS1:
+		if(GameServer()->Arenas()->OnCharacterSpawn(pChr))
+			break;
+		[[fallthrough]];
+	case MINIGAME_DURAK:
+		if(pChr->GetPlayer()->m_Minigame == MINIGAME_DURAK)
+			GameServer()->Durak()->OnCharacterSpawn(pChr);
+		[[fallthrough]];
+	default:
+		pChr->GiveWeapon(WEAPON_HAMMER);
+		pChr->GiveWeapon(WEAPON_GUN);
+		pChr->SetActiveWeapon(WEAPON_GUN);
+		break;
+	}
+#else
 	// give default weapons
 	pChr->GiveWeapon(WEAPON_HAMMER);
 	pChr->GiveWeapon(WEAPON_GUN);
+#endif
 }
 
 void IGameController::HandleCharacterTiles(CCharacter *pChr, int MapIndex)
@@ -580,6 +628,10 @@ void IGameController::Snap(int SnappingClient)
 	CNetObj_GameInfo GameInfo = {};
 
 	GameInfo.m_GameFlags = GameFlags_ClampToSix(m_GameFlags);
+#ifdef CONF_FDDRACE_MOD
+	if(GameServer()->m_apFlags[TEAM_RED] || GameServer()->m_apFlags[TEAM_BLUE])
+		GameInfo.m_GameFlags |= GAMEFLAG_FLAGS;
+#endif
 	GameInfo.m_GameStateFlags = 0;
 	if(m_GameOverTick != -1)
 		GameInfo.m_GameStateFlags |= GAMESTATEFLAG_GAMEOVER;
@@ -614,6 +666,42 @@ void IGameController::Snap(int SnappingClient)
 		}
 	}
 	Server()->SnapNewItem(0, GameInfo);
+
+#ifdef CONF_FDDRACE_MOD
+	if(GameServer()->m_apFlags[TEAM_RED] || GameServer()->m_apFlags[TEAM_BLUE])
+	{
+		CNetObj_GameData GameData = {};
+		GameData.m_TeamscoreRed = 0;
+		GameData.m_TeamscoreBlue = 0;
+		GameData.m_FlagCarrierRed = FLAG_ATSTAND;
+		GameData.m_FlagCarrierBlue = FLAG_ATSTAND;
+		for(int Team = 0; Team < 2; Team++)
+		{
+			CFlag *pFlag = GameServer()->m_apFlags[Team];
+			if(!pFlag)
+			{
+				if(Team == TEAM_RED)
+					GameData.m_FlagCarrierRed = FLAG_MISSING;
+				else
+					GameData.m_FlagCarrierBlue = FLAG_MISSING;
+				continue;
+			}
+			int Carrier = FLAG_ATSTAND;
+			if(!pFlag->IsAtStand())
+			{
+				if(CCharacter *pCarrier = pFlag->GetCarrier())
+					Carrier = pCarrier->GetPlayer()->GetCid();
+				else
+					Carrier = FLAG_TAKEN;
+			}
+			if(Team == TEAM_RED)
+				GameData.m_FlagCarrierRed = Carrier;
+			else
+				GameData.m_FlagCarrierBlue = Carrier;
+		}
+		Server()->SnapNewItem(0, GameData);
+	}
+#endif
 
 	CNetObj_GameInfoEx GameInfoEx = {};
 	GameInfoEx.m_Flags =

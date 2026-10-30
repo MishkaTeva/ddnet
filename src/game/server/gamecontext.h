@@ -22,14 +22,26 @@
 
 #ifdef CONF_FDDRACE_MOD
 #include <mod/game/server/account.h>
+#include <mod/game/server/fddrace_save.h>
+#include <mod/game/server/houses/house.h>
+#include <mod/game/server/houses/shop.h>
+#include <mod/game/server/houses/bank.h>
+#include <mod/game/server/houses/tavern.h>
+#include <mod/game/server/votingmenu.h>
+#include <mod/game/server/minigames/minigame.h>
 class CLaserText;
 class CMoney;
+class CArenas;
+class CDurak;
+class CSurvival;
+class CFng;
 #endif
 
 #include <map>
 #include <memory>
 #include <optional>
 #include <string>
+#include <utility>
 
 /*
 	Tick
@@ -325,6 +337,7 @@ public:
 	void SendEmoticon(int ClientId, int Emoticon, int TargetClientId) const;
 	void SendWeaponPickup(int ClientId, int Weapon) const;
 	void SendMotd(int ClientId) const;
+	void SendMotd(const char *pText, int ClientId);
 	void SendSettings(int ClientId) const;
 	void SendServerAlert(const char *pMessage);
 	void SendModeratorAlert(int ToClientId, const char *pMessage);
@@ -361,10 +374,115 @@ public:
 	void RegisterFddraceAccountCommands();
 	CAccountSystem *Accounts() { return &m_Accounts; }
 	CAccountSystem m_Accounts;
+	CFddraceSave m_FddraceSave;
+	bool CheckLoadPlayer(int ClientId, bool FromSpawn = false);
+	int GetRedirectListPort(int WantedSwitchNumber) const;
+	int GetRedirectListSwitch(int WantedPort) const;
+
+	class CFlag *m_apFlags[2] = {};
+	class CFlag *GetFlag(int Team);
+	int HasFlag(class CCharacter *pChr);
+	void ForceFlagOwner(int ClientId, int Team);
+
+	class CHouse *m_pHouses[NUM_HOUSES] = {};
+	int m_aTaserPrice[NUM_TASER_LEVELS] = {};
+	int m_aPoliceLevel[NUM_POLICE_LEVELS] = {};
+	CVotingMenu m_VotingMenu;
+
+	enum
+	{
+		PLOT_START = 1,
+	};
+	struct SPlot
+	{
+		char m_aOwner[32] = {};
+		char m_aDisplayName[32] = {};
+		int64_t m_ExpireDate = 0;
+		int m_Size = PLOT_SMALL;
+		std::vector<CEntity *> m_vObjects;
+	} m_aPlots[MAX_PLOTS];
+
+	void InitPlots();
+	int GetPlotID(int AccId);
+	int GetTilePlotID(vec2 Pos) const;
+	void SetPlotInfo(int PlotId, int AccId);
+	void SetPlotExpire(int PlotId);
+	bool HasPlotByIP(int ClientId);
+	unsigned int GetMaxPlotObjects(int PlotId) const;
+	unsigned int NumPlotObjects(int PlotId) const;
+	CEntity *GetPlotObject(int PlotId, int Index) const;
+	bool CanInsertNewEntity(int PlotId) const;
+	bool InsertPlotDrawEntity(CEntity *pEntity);
+	bool ErasePlotDrawEntity(CEntity *pEntity);
+	void ClearPlotObjects(int PlotId);
+	const char *GetPlotSizeString(int PlotId) const;
+	const char *GetDate(int64_t Timestamp) const;
 
 	CLaserText *CreateLaserText(vec2 Pos, int Owner, const char *pText, int Seconds = 3, bool AboveTee = true);
 	CMoney *CreateMoney(vec2 Pos, int64_t Amount, int Owner = -1, float Direction = 0, bool GlobalPickupDelay = false);
 	class CFlyingPoint *CreateFlyingPoint(vec2 Pos, int To, int Owner, vec2 InitialVel, vec2 ToPos = vec2(-1, -1));
+	bool SpawnHelicopter(vec2 Pos, int TurretType = 2, bool Build = true, int Number = -1);
+
+	// Minigames (F-DDrace)
+	class CMinigame *m_pMinigames[NUM_MINIGAMES] = {};
+	bool m_aMinigameDisabled[NUM_MINIGAMES] = {};
+	CArenas *Arenas() { return (CArenas *)m_pMinigames[MINIGAME_1VS1]; }
+	CDurak *Durak() { return (CDurak *)m_pMinigames[MINIGAME_DURAK]; }
+	CSurvival *Survival() { return (CSurvival *)m_pMinigames[MINIGAME_SURVIVAL]; }
+	CMinigame *BlockMg() { return m_pMinigames[MINIGAME_BLOCK]; }
+	void InitMinigames();
+	void SetMinigame(int ClientId, int Minigame, bool Force = false, bool DoChatMsg = true);
+	const char *GetMinigameName(int Minigame);
+	const char *GetMinigameCommand(int Minigame);
+	void InstagibTick(int Type);
+	void UpdateHidePlayers(int UpdateId = -1);
+	void SendTeamChange(int ClientId, int Team, bool Silent, int CooldownTick, int ToClientId);
+	CTuningParams *Tuning() { return GlobalTuning(); }
+	bool IsTuneInList(LOCKED_TUNES *pLockedTunings, const char *pParam);
+	int SetLockedTune(LOCKED_TUNES *pLockedTunings, CLockedTune &Tune, bool AllowGlobalValues = false);
+	CTuningParams *ApplyLockedTunings(CTuningParams *pTuning, LOCKED_TUNES &LockedTunings);
+	static CClientMask CmaskOne(int ClientId)
+	{
+		CClientMask Mask;
+		Mask.reset();
+		if(ClientId >= 0 && ClientId < MAX_CLIENTS)
+			Mask.set(ClientId);
+		return Mask;
+	}
+	static CClientMask CmaskNone() { return CClientMask(); }
+	void ResetKillAnnouncer(int ClientId = -1) { (void)ClientId; /* TODO */ }
+	void PlayMapSoundClients(int MapSoundId, const int *pClientIds, int NumClients, int FallbackSoundId = -1)
+	{
+		(void)MapSoundId; (void)pClientIds; (void)NumClients; (void)FallbackSoundId; /* TODO */
+	}
+
+	enum
+	{
+		CHATFLAG_ALL = FLAG_SIX | FLAG_SIXUP,
+	};
+
+	template<typename... Args>
+	void SendChatFormat(int ChatterClientId, int Mode, int To, int Flags, const char *pFormat, Args &&...args)
+	{
+		(void)Mode;
+		(void)Flags;
+		char aBuf[1024];
+		str_format(aBuf, sizeof(aBuf), pFormat, std::forward<Args>(args)...);
+		if(To >= 0)
+			SendChatTarget(To, aBuf);
+		else
+			SendChat(ChatterClientId, TEAM_ALL, aBuf);
+	}
+
+	template<typename... Args>
+	void SendChatTargetFormat(int To, const char *pFormat, Args &&...args)
+	{
+		char aBuf[1024];
+		str_format(aBuf, sizeof(aBuf), pFormat, std::forward<Args>(args)...);
+		SendChatTarget(To, aBuf);
+	}
+
+	void CreateFinishConfetti(vec2 Pos, CClientMask Mask = CClientMask().set()) { CreateBirthdayEffect(Pos, Mask); /* TODO: confetti */ }
 
 	static void ConRegister(IConsole::IResult *pResult, void *pUserData);
 	static void ConLogin(IConsole::IResult *pResult, void *pUserData);
@@ -404,6 +522,23 @@ public:
 	static void ConGiveGrog(IConsole::IResult *pResult, void *pUserData);
 	static void ConGrogSip(IConsole::IResult *pResult, void *pUserData);
 	static void ConGrogDrop(IConsole::IResult *pResult, void *pUserData);
+	static void ConSaveDrop(IConsole::IResult *pResult, void *pUserData);
+	static void ConListSavedTees(IConsole::IResult *pResult, void *pUserData);
+	static void ConWalletAdd(IConsole::IResult *pResult, void *pUserData);
+	static void ConSpawnButton(IConsole::IResult *pResult, void *pUserData);
+	static void ConSpawnHelicopter(IConsole::IResult *pResult, void *pUserData);
+	static void ConForceFlagOwner(IConsole::IResult *pResult, void *pUserData);
+	static void ConSpawnSpeedup(IConsole::IResult *pResult, void *pUserData);
+	static void ConRedirectClientSafe(IConsole::IResult *pResult, void *pUserData);
+	static void ConDrawTool(IConsole::IResult *pResult, void *pUserData);
+	static void ConRoomInvite(IConsole::IResult *pResult, void *pUserData);
+	static void ConRoomKick(IConsole::IResult *pResult, void *pUserData);
+	static void ConVipCosmetic(IConsole::IResult *pResult, void *pUserData);
+	static void ConBuyRoomKey(IConsole::IResult *pResult, void *pUserData);
+	static void ConMoney(IConsole::IResult *pResult, void *pUserData);
+	static void ConDiscord(IConsole::IResult *pResult, void *pUserData);
+	static void ConAccountInfo(IConsole::IResult *pResult, void *pUserData);
+	static void ConAccSet(IConsole::IResult *pResult, void *pUserData);
 #endif
 	void RegisterDDRaceCommands();
 	void RegisterChatCommands();
@@ -681,6 +816,14 @@ private:
 	static void ConFddraceCompatNotImplemented(IConsole::IResult *pResult, void *pUserData);
 	static void ConAllWeaponsCompat(IConsole::IResult *pResult, void *pUserData);
 	static void ConUnAllWeaponsCompat(IConsole::IResult *pResult, void *pUserData);
+
+	static void ConLeaveMinigame(IConsole::IResult *pResult, void *pUserData);
+	static void ConJoinBlock(IConsole::IResult *pResult, void *pUserData);
+	static void ConJoinSurvival(IConsole::IResult *pResult, void *pUserData);
+	static void ConJoinBoomFNG(IConsole::IResult *pResult, void *pUserData);
+	static void ConJoinFNG(IConsole::IResult *pResult, void *pUserData);
+	static void Con1VS1(IConsole::IResult *pResult, void *pUserData);
+	static void ConJoinDurak(IConsole::IResult *pResult, void *pUserData);
 #endif
 
 	void Whisper(int ClientId, char *pStr);

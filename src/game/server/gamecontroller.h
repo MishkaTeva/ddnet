@@ -131,6 +131,11 @@ public:
 
 	virtual void OnReset();
 
+#ifdef CONF_FDDRACE_MOD
+	// Stub: F-DDrace refreshed race-flag / scoreboard gameinfo on minigame join/leave.
+	void UpdateGameInfo(int ClientId) { (void)ClientId; }
+#endif
+
 	// game
 	virtual void DoWarmup(int Seconds);
 

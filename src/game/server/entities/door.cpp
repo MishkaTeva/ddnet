@@ -11,22 +11,48 @@
 #include <game/teamscore.h>
 
 CDoor::CDoor(CGameWorld *pGameWorld, vec2 Pos, float Rotation, int Length,
-	int Number) :
-	CEntity(pGameWorld, CGameWorld::ENTTYPE_LASER, true)
+	int Number, bool Collision) :
+	CEntity(pGameWorld, CGameWorld::ENTTYPE_DOOR, true)
 {
 	m_Number = Number;
 	m_Pos = Pos;
 	m_Length = Length;
+	m_Rotation = Rotation;
+	m_Collision = Collision;
 	m_Direction = vec2(std::sin(Rotation), std::cos(Rotation));
-	vec2 To = Pos + normalize(m_Direction) * m_Length;
-
-	GameServer()->Collision()->IntersectNoLaser(Pos, To, &this->m_To, nullptr);
+	UpdateEndpoint();
 	ResetCollision();
 	GameWorld()->InsertEntity(this);
 }
 
+CDoor::~CDoor()
+{
+	ClearCollision();
+}
+
+void CDoor::UpdateEndpoint()
+{
+	vec2 To = m_Pos + normalize(m_Direction) * m_Length;
+	GameServer()->Collision()->IntersectNoLaser(m_Pos, To, &this->m_To, nullptr);
+}
+
+void CDoor::SetDirection(float Rotation)
+{
+	m_Rotation = Rotation;
+	m_Direction = vec2(std::sin(Rotation), std::cos(Rotation));
+	UpdateEndpoint();
+}
+
+void CDoor::SetLength(int Length)
+{
+	m_Length = Length;
+	UpdateEndpoint();
+}
+
 void CDoor::ResetCollision()
 {
+	if(!m_Collision)
+		return;
 	if(GameServer()->Collision()->GetTile(m_Pos.x, m_Pos.y) || GameServer()->Collision()->GetFrontTile(m_Pos.x, m_Pos.y))
 		return;
 
@@ -40,6 +66,20 @@ void CDoor::ResetCollision()
 	}
 }
 
+void CDoor::ClearCollision()
+{
+	if(!m_Collision)
+		return;
+	for(int i = 0; i < m_Length - 1; i++)
+	{
+		vec2 CurrentPos = m_Pos + m_Direction * i;
+		if(GameServer()->Collision()->CheckPoint(CurrentPos))
+			break;
+		GameServer()->Collision()->SetDoorCollisionAt(CurrentPos.x, CurrentPos.y, TILE_AIR, 0, 0);
+	}
+	m_Collision = false;
+}
+
 void CDoor::Reset()
 {
 	m_MarkedForDestroy = true;
@@ -49,6 +89,12 @@ void CDoor::Snap(int SnappingClient)
 {
 	if((NetworkClipped(SnappingClient, m_Pos) && NetworkClipped(SnappingClient, m_To)) || !GetId().has_value())
 		return;
+
+#ifdef CONF_FDDRACE_MOD
+	CCharacter *pSnapChr = GameServer()->GetPlayerChar(SnappingClient);
+	if(pSnapChr && pSnapChr->m_DrawEditor.OnSnapPreview(this))
+		return;
+#endif
 
 	int SnappingClientVersion = GameServer()->GetClientVersion(SnappingClient);
 

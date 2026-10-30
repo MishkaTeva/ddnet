@@ -47,6 +47,10 @@
 
 #include <game/version.h>
 
+#ifdef CONF_FDDRACE_MOD
+#include <generated/protocol.h>
+#endif
+
 #include <zlib.h>
 
 #include <algorithm>
@@ -245,6 +249,7 @@ void CServer::CClient::Reset()
 	std::fill(std::begin(m_aIdMap), std::end(m_aIdMap), -1);
 	std::fill(std::begin(m_aReverseIdMap), std::end(m_aReverseIdMap), -1);
 #ifdef CONF_FDDRACE_MOD
+	m_Main = true;
 	m_SentIamTater = false;
 	m_TClientVerified = false;
 	m_HasHardcodedHash = false;
@@ -750,7 +755,12 @@ void CServer::SetClientDDNetVersion(int ClientId, int DDNetVersion)
 {
 	dbg_assert(ClientId >= 0 && ClientId < MAX_CLIENTS, "Invalid ClientId: %d", ClientId);
 
+#ifdef CONF_FDDRACE_MOD
+	// Allow early Cl_IsDDNet while map is still downloading (AUTH..READY).
+	if(m_aClients[ClientId].m_State >= CClient::STATE_AUTH)
+#else
 	if(m_aClients[ClientId].m_State == CClient::STATE_INGAME)
+#endif
 	{
 		m_aClients[ClientId].m_DDNetVersion = DDNetVersion;
 		m_aClients[ClientId].m_DDNetVersionSettled = true;
@@ -2048,6 +2058,26 @@ void CServer::ProcessClientPacket(CNetChunk *pPacket)
 		// game message
 		GameServer()->OnMessage(Msg, &Unpacker, ClientId);
 	}
+#ifdef CONF_FDDRACE_MOD
+	else if(!Sys && Msg == NETMSGTYPE_CL_ISDDNETLEGACY &&
+		(pPacket->m_Flags & NET_CHUNKFLAG_VITAL) != 0 &&
+		m_aClients[ClientId].m_State >= CClient::STATE_AUTH &&
+		m_aClients[ClientId].m_State < CClient::STATE_READY)
+	{
+		// AllTheHaxx / legacy DDNet send Cl_IsDDNet while still downloading the map.
+		if(!m_aClients[ClientId].m_GotDDNetVersionPacket &&
+			(!m_aClients[ClientId].m_DDNetVersionSettled || m_aClients[ClientId].m_DDNetVersion <= VERSION_DDRACE))
+		{
+			const int DDNetVersion = Unpacker.GetInt();
+			if(!Unpacker.Error() && DDNetVersion > 0)
+			{
+				SetClientDDNetVersion(ClientId, DDNetVersion);
+				dbg_msg("server", "ClientId=%d: early Cl_IsDDNet version=%d (state=%d)",
+					ClientId, DDNetVersion, m_aClients[ClientId].m_State);
+			}
+		}
+	}
+#endif
 }
 
 void CServer::OnNetMsgClientVer(int ClientId, CUuid *pConnectionId, int DDNetVersion, const char *pDDNetVersionStr)
@@ -2067,6 +2097,12 @@ void CServer::OnNetMsgClientVer(int ClientId, CUuid *pConnectionId, int DDNetVer
 	{
 		m_aClients[ClientId].m_State = CClient::STATE_AUTH;
 	}
+#ifdef CONF_FDDRACE_MOD
+	m_aClients[ClientId].m_Main = true;
+	const int DummyPair = GetDummy(ClientId);
+	if(DummyPair != -1)
+		m_aClients[ClientId].m_Main = false;
+#endif
 }
 
 void CServer::OnNetMsgInfo(int ClientId, const char *pVersion, const char *pPasswordOrNullptr)
@@ -4997,5 +5033,34 @@ bool CServer::IsOldClient(int ClientId) const
 	if(ClientId < 0 || ClientId >= MAX_CLIENTS)
 		return false;
 	return m_aClients[ClientId].m_Sixup && !m_aClients[ClientId].m_GotDDNetVersionPacket;
+}
+
+bool CServer::IsMain(int ClientId) const
+{
+	if(ClientId < 0 || ClientId >= MAX_CLIENTS)
+		return true;
+	return m_aClients[ClientId].m_Main;
+}
+
+int CServer::GetDummy(int ClientId) const
+{
+	if(ClientId < 0 || ClientId >= MAX_CLIENTS)
+		return -1;
+	if(m_aClients[ClientId].m_State == CClient::STATE_EMPTY)
+		return -1;
+
+	for(int i = 0; i < MAX_CLIENTS; i++)
+	{
+		if(i == ClientId)
+			continue;
+		if(m_aClients[i].m_State == CClient::STATE_EMPTY || m_aClients[i].m_DebugDummy)
+			continue;
+		if(m_aClients[ClientId].m_ConnectionId != m_aClients[i].m_ConnectionId)
+			continue;
+		if(net_addr_comp_noport(m_NetServer.ClientAddr(ClientId), m_NetServer.ClientAddr(i)) != 0)
+			continue;
+		return i;
+	}
+	return -1;
 }
 #endif

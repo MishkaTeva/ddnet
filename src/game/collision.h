@@ -145,11 +145,39 @@ public:
 #ifdef CONF_FDDRACE_MOD
 	static bool IsPlotTile(int Index);
 	int NumPlots() const { return m_NumPlots; }
+	int GetPlotID(int Index) const;
 	int GetSwitchByPlot(int PlotId) const;
 	int GetPlotBySwitch(int SwitchId) const;
 	bool IsPlotDoor(int SwitchId) const;
 	void SetTeleporter(vec2 Pos, int Type, int Number);
 	std::vector<vec2> &TeleOutsMutable(int Number) { return m_TeleOuts[Number]; }
+
+	struct SRedirectTile
+	{
+		int m_Number = 0;
+		vec2 m_Pos{};
+	};
+	std::vector<SRedirectTile> m_vRedirectTiles;
+	vec2 GetRandomRedirectTile(int Number) const;
+
+	void ClearModTiles();
+	void CollectModTile(int Index, vec2 Pos);
+	vec2 GetRandomModTile(int TileIndex) const;
+	bool HasModTile(int TileIndex) const;
+
+	// Slim door-tile helpers for plot doors / buttons (single-slot DDNet CDoorTile).
+	bool AddDoorTile(int Index, int Type, int Number, int Flags = 0);
+	bool RemoveDoorTile(int Index, int Type, int Number);
+	void SetSpeedup(vec2 Pos, int Angle, int Force, int MaxSpeed);
+
+	// Minigame / 1vs1 helpers (ported from F-DDrace)
+	int GetTileRaw(int x, int y) const { return GetTileIndex(GetPureMapIndex(x, y)); }
+	int GetTileRaw(vec2 Pos) const { return GetTileRaw(round_to_int(Pos.x), round_to_int(Pos.y)); }
+	int GetFTileRaw(int x, int y) const { return GetFrontTileIndex(GetPureMapIndex(x, y)); }
+	int GetFTileRaw(vec2 Pos) const { return GetFTileRaw(round_to_int(Pos.x), round_to_int(Pos.y)); }
+	vec2 RoundPos(vec2 Pos) const;
+	int GetNumAllSwitchers() const { return HighestSwitcherId(); }
+	bool IsFightBorder(vec2 Pos, int Fight) const;
 #endif
 
 	/**
@@ -191,6 +219,8 @@ private:
 
 #ifdef CONF_FDDRACE_MOD
 	int m_NumPlots = 0;
+	std::vector<vec2> m_vJailTiles;
+	std::vector<vec2> m_vJailReleaseTiles;
 #endif
 
 	// TILE_TELEIN

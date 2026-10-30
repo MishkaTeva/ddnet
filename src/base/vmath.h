@@ -92,6 +92,18 @@ constexpr vector2_base<T> rotate(const vector2_base<T> &a, float angle)
 }
 
 template<Numeric T>
+inline vector2_base<T> rotate_around_point(vector2_base<T> Point, vector2_base<T> Pivot, float Angle)
+{
+	const T s = static_cast<T>(std::sin(Angle));
+	const T c = static_cast<T>(std::cos(Angle));
+	Point -= Pivot;
+	vector2_base<T> Rotated;
+	Rotated.x = Point.x * c - Point.y * s;
+	Rotated.y = Point.x * s + Point.y * c;
+	return Rotated + Pivot;
+}
+
+template<Numeric T>
 inline T distance(const vector2_base<T> a, const vector2_base<T> &b)
 {
 	return length(a - b);

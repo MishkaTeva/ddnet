@@ -57,6 +57,7 @@ struct SFddraceCompatCommandContext
 #endif
 
 #include <vector>
+#include <algorithm>
 
 // Not thread-safe!
 class CClientChatLogger : public ILogger
@@ -180,6 +181,19 @@ CGameContext::~CGameContext()
 
 	delete m_pScore;
 	m_pScore = nullptr;
+
+#ifdef CONF_FDDRACE_MOD
+	for(int i = 0; i < NUM_HOUSES; i++)
+	{
+		delete m_pHouses[i];
+		m_pHouses[i] = nullptr;
+	}
+	for(int i = 0; i < NUM_MINIGAMES; i++)
+	{
+		delete m_pMinigames[i];
+		m_pMinigames[i] = nullptr;
+	}
+#endif
 }
 
 void CGameContext::Clear()
@@ -522,9 +536,214 @@ void CGameContext::CreateSoundGlobal(int Sound, int Target) const
 }
 
 #ifdef CONF_FDDRACE_MOD
+#include <ctime>
+
 #include <mod/game/server/entities/flyingpoint.h>
+#include <mod/game/server/entities/flag.h>
+#include <mod/game/server/entities/helicopter.h>
 #include <mod/game/server/entities/lasertext.h>
 #include <mod/game/server/entities/money.h>
+#include <mod/game/server/entities/playercounter.h>
+#include <mod/game/server/minigames/arenas.h>
+#include <mod/game/server/minigames/durak.h>
+#include <mod/game/server/minigames/fng.h>
+#include <mod/game/server/minigames/minigame.h>
+#include <mod/game/server/minigames/survival.h>
+#include <engine/shared/localization.h>
+
+void CGameContext::InitPlots()
+{
+	for(auto &Plot : m_aPlots)
+	{
+		Plot.m_aOwner[0] = 0;
+		Plot.m_aDisplayName[0] = 0;
+		Plot.m_ExpireDate = 0;
+		Plot.m_Size = PLOT_SMALL;
+		Plot.m_vObjects.clear();
+	}
+
+	// Plot size is encoded as TOTELE switch delay (F-DDrace layout).
+	const CSwitchTile *pSwitch = Collision()->SwitchLayer();
+	if(!pSwitch)
+		return;
+	const int Width = Collision()->GetWidth();
+	const int Height = Collision()->GetHeight();
+	for(int i = 0; i < Width * Height; i++)
+	{
+		if(pSwitch[i].m_Type != TILE_SWITCH_PLOT_TOTELE || pSwitch[i].m_Number <= 0)
+			continue;
+		const int PlotId = Collision()->GetPlotBySwitch(pSwitch[i].m_Number);
+		const int Size = pSwitch[i].m_Delay;
+		if(PlotId >= PLOT_START && PlotId < MAX_PLOTS && Size >= 0 && Size < NUM_PLOT_SIZES)
+			m_aPlots[PlotId].m_Size = Size;
+	}
+}
+
+int CGameContext::GetPlotID(int AccId)
+{
+	if(AccId < ACC_START)
+		return 0;
+	SAccountInfo *pAcc = Accounts()->Get(AccId);
+	if(!pAcc)
+		return 0;
+	const int NumPlots = Collision()->NumPlots();
+	for(int i = PLOT_START; i < NumPlots + 1 && i < MAX_PLOTS; i++)
+	{
+		if(str_comp(pAcc->m_aUsername, m_aPlots[i].m_aOwner) == 0)
+			return i;
+	}
+	return 0;
+}
+
+int CGameContext::GetTilePlotID(vec2 Pos) const
+{
+	return m_Collision.GetPlotID(m_Collision.GetPureMapIndex(Pos));
+}
+
+void CGameContext::SetPlotInfo(int PlotId, int AccId)
+{
+	if(PlotId <= 0 || PlotId > Collision()->NumPlots() || PlotId >= MAX_PLOTS || AccId < ACC_START)
+		return;
+	SAccountInfo *pAcc = Accounts()->Get(AccId);
+	if(!pAcc)
+		return;
+	str_copy(m_aPlots[PlotId].m_aOwner, pAcc->m_aUsername, sizeof(m_aPlots[PlotId].m_aOwner));
+	str_copy(m_aPlots[PlotId].m_aDisplayName, pAcc->m_aLastPlayerName, sizeof(m_aPlots[PlotId].m_aDisplayName));
+}
+
+void CGameContext::SetPlotExpire(int PlotId)
+{
+	if(PlotId <= 0 || PlotId > Collision()->NumPlots() || PlotId >= MAX_PLOTS)
+		return;
+	const int Days = m_aPlots[PlotId].m_Size == PLOT_SMALL ? ITEM_EXPIRE_PLOT_SMALL : m_aPlots[PlotId].m_Size == PLOT_BIG ? ITEM_EXPIRE_PLOT_BIG : 0;
+	time_t Now = time(nullptr);
+	m_aPlots[PlotId].m_ExpireDate = (int64_t)(Now + (time_t)Days * 24 * 60 * 60);
+}
+
+bool CGameContext::HasPlotByIP(int ClientId)
+{
+	const NETADDR *pAddr = Server()->ClientAddr(ClientId);
+	if(!pAddr)
+		return false;
+	const int NumPlots = Collision()->NumPlots();
+	for(int i = PLOT_START; i < NumPlots + 1 && i < MAX_PLOTS; i++)
+	{
+		if(!m_aPlots[i].m_aOwner[0])
+			continue;
+		const int OwnerAcc = Accounts()->FindByUsername(m_aPlots[i].m_aOwner);
+		SAccountInfo *pAcc = Accounts()->Get(OwnerAcc);
+		if(!pAcc || OwnerAcc < ACC_START)
+			continue;
+		if(net_addr_comp_noport(pAddr, &pAcc->m_Addr) == 0)
+			return true;
+	}
+	return false;
+}
+
+unsigned int CGameContext::GetMaxPlotObjects(int PlotId) const
+{
+	if(PlotId < 0 || PlotId > m_Collision.NumPlots() || PlotId >= MAX_PLOTS)
+		return 0;
+	if(PlotId >= PLOT_START)
+	{
+		switch(m_aPlots[PlotId].m_Size)
+		{
+		case PLOT_SMALL: return g_Config.m_SvMaxObjectsPlotSmall;
+		case PLOT_BIG: return g_Config.m_SvMaxObjectsPlotBig;
+		}
+	}
+	return g_Config.m_SvMaxObjectsFreeDraw;
+}
+
+unsigned int CGameContext::NumPlotObjects(int PlotId) const
+{
+	if(PlotId < 0 || PlotId >= MAX_PLOTS)
+		return 0;
+	return (unsigned int)m_aPlots[PlotId].m_vObjects.size();
+}
+
+CEntity *CGameContext::GetPlotObject(int PlotId, int Index) const
+{
+	if(PlotId < 0 || PlotId >= MAX_PLOTS || Index < 0 || Index >= (int)m_aPlots[PlotId].m_vObjects.size())
+		return nullptr;
+	return m_aPlots[PlotId].m_vObjects[Index];
+}
+
+bool CGameContext::CanInsertNewEntity(int PlotId) const
+{
+	if(PlotId < 0 || PlotId >= MAX_PLOTS)
+		return false;
+	return m_aPlots[PlotId].m_vObjects.size() < GetMaxPlotObjects(PlotId);
+}
+
+bool CGameContext::InsertPlotDrawEntity(CEntity *pEntity)
+{
+	if(!pEntity || pEntity->m_PlotID < 0 || pEntity->m_PlotID >= MAX_PLOTS)
+		return false;
+	m_aPlots[pEntity->m_PlotID].m_vObjects.push_back(pEntity);
+	return true;
+}
+
+bool CGameContext::ErasePlotDrawEntity(CEntity *pEntity)
+{
+	if(!pEntity || pEntity->m_PlotID < 0 || pEntity->m_PlotID >= MAX_PLOTS)
+		return false;
+	auto &vObjects = m_aPlots[pEntity->m_PlotID].m_vObjects;
+	for(unsigned i = 0; i < vObjects.size(); i++)
+	{
+		if(vObjects[i] == pEntity)
+		{
+			vObjects.erase(vObjects.begin() + i);
+			return true;
+		}
+	}
+	return false;
+}
+
+void CGameContext::ClearPlotObjects(int PlotId)
+{
+	if(PlotId < 0 || PlotId >= MAX_PLOTS)
+		return;
+	// Copy then clear so Destroy() cannot invalidate the iterating container.
+	std::vector<CEntity *> vCopy = m_aPlots[PlotId].m_vObjects;
+	m_aPlots[PlotId].m_vObjects.clear();
+	for(CEntity *pEnt : vCopy)
+	{
+		if(pEnt)
+			pEnt->Destroy();
+	}
+}
+
+const char *CGameContext::GetPlotSizeString(int PlotId) const
+{
+	if(PlotId < 0 || PlotId >= MAX_PLOTS)
+		return "unknown";
+	switch(m_aPlots[PlotId].m_Size)
+	{
+	case PLOT_SMALL: return "small";
+	case PLOT_BIG: return "big";
+	default: return "unknown";
+	}
+}
+
+const char *CGameContext::GetDate(int64_t Timestamp) const
+{
+	static char aBuf[32];
+	if(!Timestamp)
+	{
+		str_copy(aBuf, "n/a", sizeof(aBuf));
+		return aBuf;
+	}
+	time_t T = (time_t)Timestamp;
+	struct tm *pTm = localtime(&T);
+	if(!pTm)
+	{
+		str_copy(aBuf, "n/a", sizeof(aBuf));
+		return aBuf;
+	}
+	str_format(aBuf, sizeof(aBuf), "%04d-%02d-%02d", pTm->tm_year + 1900, pTm->tm_mon + 1, pTm->tm_mday);
+	return aBuf;
+}
 
 CLaserText *CGameContext::CreateLaserText(vec2 Pos, int Owner, const char *pText, int Seconds, bool AboveTee)
 {
@@ -547,6 +766,17 @@ CMoney *CGameContext::CreateMoney(vec2 Pos, int64_t Amount, int Owner, float Dir
 CFlyingPoint *CGameContext::CreateFlyingPoint(vec2 Pos, int To, int Owner, vec2 InitialVel, vec2 ToPos)
 {
 	return new CFlyingPoint(&m_World, Pos, To, Owner, InitialVel, ToPos);
+}
+
+bool CGameContext::SpawnHelicopter(vec2 Pos, int TurretType, bool Build, int Number)
+{
+	const vec2 Hitbox = HELICOPTER_PHYSSIZE;
+	if(Build)
+		Pos.y -= Hitbox.y / 2.f - 14.f;
+	if(Collision()->TestBox(Pos, Hitbox))
+		return false;
+	new CHelicopter(&m_World, Pos, -1, TurretType, Build, Number);
+	return true;
 }
 #endif
 
@@ -846,6 +1076,10 @@ void CGameContext::SendEmoticon(int ClientId, int Emoticon, int TargetClientId) 
 
 void CGameContext::SendWeaponPickup(int ClientId, int Weapon) const
 {
+#ifdef CONF_FDDRACE_MOD
+	if(Weapon >= NUM_VANILLA_WEAPONS)
+		Weapon = WEAPON_LASER;
+#endif
 	CNetMsg_Sv_WeaponPickup Msg;
 	Msg.m_Weapon = Weapon;
 	Server()->SendPackMsg(&Msg, MSGFLAG_VITAL, ClientId);
@@ -855,6 +1089,13 @@ void CGameContext::SendMotd(int ClientId) const
 {
 	CNetMsg_Sv_Motd Msg;
 	Msg.m_pMessage = g_Config.m_SvMotd;
+	Server()->SendPackMsg(&Msg, MSGFLAG_VITAL, ClientId);
+}
+
+void CGameContext::SendMotd(const char *pText, int ClientId)
+{
+	CNetMsg_Sv_Motd Msg;
+	Msg.m_pMessage = pText ? pText : "";
 	Server()->SendPackMsg(&Msg, MSGFLAG_VITAL, ClientId);
 }
 
@@ -1176,6 +1417,12 @@ void CGameContext::SendTuningParams(int ClientId, int Zone)
 
 	CTuningParams Params = m_aTuningList[Zone];
 
+#ifdef CONF_FDDRACE_MOD
+	CCharacter *pLockedChr = m_apPlayers[ClientId]->GetCharacter();
+	if(pLockedChr)
+		Params = *ApplyLockedTunings(&Params, pLockedChr->m_LockedTunings);
+#endif
+
 	CCharacter *pCharacter = m_apPlayers[ClientId]->GetCharacter();
 	int NeededFakeTuning = pCharacter ? pCharacter->NeededFaketuning() : 0;
 
@@ -1269,6 +1516,16 @@ void CGameContext::OnTick()
 
 	m_pController->Tick();
 
+#ifdef CONF_FDDRACE_MOD
+	// Before player ticks: wanted/account vote pages refresh from Tick()
+	m_VotingMenu.Tick();
+	for(int i = 0; i < NUM_MINIGAMES; i++)
+	{
+		if(m_pMinigames[i])
+			m_pMinigames[i]->Tick();
+	}
+#endif
+
 	for(int i = 0; i < MAX_CLIENTS; i++)
 	{
 		if(m_apPlayers[i])
@@ -1298,6 +1555,20 @@ void CGameContext::OnTick()
 		if(pPlayer)
 			pPlayer->PostPostTick();
 	}
+
+#ifdef CONF_FDDRACE_MOD
+	m_FddraceSave.OnTick();
+	for(int i = 0; i < MAX_CLIENTS; i++)
+	{
+		if(!m_apPlayers[i])
+			continue;
+		for(int h = 0; h < NUM_HOUSES; h++)
+		{
+			if(m_pHouses[h])
+				m_pHouses[h]->Tick(i);
+		}
+	}
+#endif
 
 	// update voting
 	if(m_VoteCloseTime)
@@ -1681,6 +1952,11 @@ void CGameContext::OnClientPredictedEarlyInput(int ClientId, const void *pInput)
 
 void CGameContext::ProgressVoteOptions(int ClientId)
 {
+#ifdef CONF_FDDRACE_MOD
+	if(!m_VotingMenu.IsVotesPage(ClientId))
+		return;
+	m_VotingMenu.ProgressVoteOptions(ClientId);
+#else
 	CPlayer *pPl = m_apPlayers[ClientId];
 
 	if(pPl->m_SendVoteIndex == -1)
@@ -1767,6 +2043,7 @@ void CGameContext::ProgressVoteOptions(int ClientId)
 		CNetMsg_Sv_VoteOptionGroupEnd EndMsg;
 		Server()->SendPackMsg(&EndMsg, MSGFLAG_VITAL, ClientId);
 	}
+#endif
 }
 
 void CGameContext::OnClientEnter(int ClientId)
@@ -1910,6 +2187,7 @@ void CGameContext::OnClientDrop(int ClientId, const char *pReason)
 
 #ifdef CONF_FDDRACE_MOD
 	m_Accounts.LogoutClient(ClientId, true);
+	m_VotingMenu.Reset(ClientId);
 #endif
 
 	AbortVoteKickOnDisconnect(ClientId);
@@ -2431,6 +2709,11 @@ void CGameContext::OnCallVoteNetMessage(const CNetMsg_Cl_CallVote *pMsg, int Cli
 	if(str_comp_nocase(pMsg->m_pType, "option") != 0 && m_PlayerMapping.DoSeeOthers(ClientId, str_toint(pMsg->m_pValue), true))
 		return;
 
+#ifdef CONF_FDDRACE_MOD
+	if(m_VotingMenu.OnMessage(ClientId, pMsg))
+		return;
+#endif
+
 	if(RateLimitPlayerVote(ClientId) || m_VoteCloseTime)
 		return;
 
@@ -2711,10 +2994,53 @@ void CGameContext::OnCallVoteNetMessage(const CNetMsg_Cl_CallVote *pMsg, int Cli
 
 void CGameContext::OnVoteNetMessage(const CNetMsg_Cl_Vote *pMsg, int ClientId)
 {
-	if(!m_VoteCloseTime)
+	CPlayer *pPlayer = m_apPlayers[ClientId];
+	if(!pPlayer)
 		return;
 
-	CPlayer *pPlayer = m_apPlayers[ClientId];
+#ifdef CONF_FDDRACE_MOD
+	// F3/F4 when no vote: F-DDrace house / flag / heli / grog / weapon drop.
+	if(!m_VoteCloseTime)
+	{
+		if(g_Config.m_SvSpamprotection && pPlayer->m_LastVoteTry && pPlayer->m_LastVoteTry + Server()->TickSpeed() / 8 > Server()->Tick())
+			return;
+		pPlayer->m_LastVoteTry = Server()->Tick();
+
+		CCharacter *pChr = pPlayer->GetCharacter();
+		if(!pChr || !pMsg->m_Vote)
+			return;
+
+		bool InHouse = false;
+		for(int i = 0; i < NUM_HOUSES; i++)
+		{
+			if(m_pHouses[i] && m_pHouses[i]->IsInside(ClientId))
+			{
+				m_pHouses[i]->OnKeyPress(ClientId, pMsg->m_Vote);
+				InHouse = true;
+			}
+		}
+
+		if(pMsg->m_Vote == 1) // F3
+		{
+			if(!InHouse)
+				pChr->DropFlag();
+		}
+		else if(pMsg->m_Vote == -1) // F4
+		{
+			if(!InHouse)
+			{
+				if(pChr->m_pHelicopter)
+					pChr->m_pHelicopter->Dismount();
+				else if(!pChr->TryMountHelicopter() && !pChr->DropGrog())
+					pChr->DropWeapon(pChr->GetActiveWeapon(), false);
+			}
+		}
+		return;
+	}
+#else
+	if(!m_VoteCloseTime)
+		return;
+#endif
 
 	if(g_Config.m_SvSpamprotection && pPlayer->m_LastVoteTry && pPlayer->m_LastVoteTry + Server()->TickSpeed() * 3 > Server()->Tick())
 		return;
@@ -3031,6 +3357,29 @@ void CGameContext::OnKillNetMessage(const CNetMsg_Cl_Kill *pMsg, int ClientId)
 	if(!pChr)
 		return;
 
+#ifdef CONF_FDDRACE_MOD
+	if(pPlayer->m_Minigame == MINIGAME_INSTAGIB_FNG || pPlayer->m_Minigame == MINIGAME_INSTAGIB_BOOMFNG)
+	{
+		if(m_pMinigames[pPlayer->m_Minigame] && !((CFng *)m_pMinigames[pPlayer->m_Minigame])->CanSelfkill(ClientId))
+			return;
+	}
+
+	if(Arenas())
+	{
+		int Fight = Arenas()->GetClientFight(ClientId);
+		if(!Arenas()->FightStarted(ClientId))
+		{
+			if(Fight >= 0)
+			{
+				Arenas()->EndFight(Fight);
+				return;
+			}
+		}
+		else if(!Arenas()->CanSelfkill(ClientId))
+			return;
+	}
+#endif
+
 	// Kill Protection
 	int CurrTime = (Server()->Tick() - pChr->m_StartTime) / Server()->TickSpeed();
 	if(g_Config.m_SvKillProtection != 0 && CurrTime >= (60 * g_Config.m_SvKillProtection) && pChr->m_DDRaceState == ERaceState::STARTED)
@@ -3078,12 +3427,17 @@ void CGameContext::OnStartInfoNetMessage(const CNetMsg_Cl_StartInfo *pMsg, int C
 	Server()->SetClientCountry(ClientId, pMsg->m_Country);
 	pPlayer->SetTeeInfos(pMsg->m_pSkin, pMsg->m_UseCustomColor, pMsg->m_ColorBody, pMsg->m_ColorFeet);
 
+#ifdef CONF_FDDRACE_MOD
+	m_VotingMenu.InitPlayer(ClientId);
+	m_VotingMenu.SendPageVotes(ClientId);
+#else
 	// send clear vote options
 	CNetMsg_Sv_VoteClearOptions ClearMsg;
 	Server()->SendPackMsg(&ClearMsg, MSGFLAG_VITAL, ClientId);
 
 	// begin sending vote options
 	pPlayer->m_SendVoteIndex = 0;
+#endif
 
 	// send tuning parameters to client
 	SendTuningParams(ClientId, pPlayer->m_TuneZone);
@@ -3588,11 +3942,16 @@ void CGameContext::ConRemoveVote(IConsole::IResult *pResult, void *pUserData)
 	pSelf->Server()->SendPackMsg(&VoteClearOptionsMsg, MSGFLAG_VITAL, -1);
 
 	// reset sending of vote options
+#ifdef CONF_FDDRACE_MOD
+	for(int i = 0; i < MAX_CLIENTS; i++)
+		pSelf->m_VotingMenu.SendPageVotes(i);
+#else
 	for(auto &pPlayer : pSelf->m_apPlayers)
 	{
 		if(pPlayer)
 			pPlayer->m_SendVoteIndex = 0;
 	}
+#endif
 
 	// TODO: improve this
 	// remove the option
@@ -3721,11 +4080,16 @@ void CGameContext::ConClearVotes(IConsole::IResult *pResult, void *pUserData)
 	pSelf->m_NumVoteOptions = 0;
 
 	// reset sending of vote options
+#ifdef CONF_FDDRACE_MOD
+	for(int i = 0; i < MAX_CLIENTS; i++)
+		pSelf->m_VotingMenu.SendPageVotes(i);
+#else
 	for(auto &pPlayer : pSelf->m_apPlayers)
 	{
 		if(pPlayer)
 			pPlayer->m_SendVoteIndex = 0;
 	}
+#endif
 }
 
 struct CMapNameItem
@@ -4046,6 +4410,78 @@ void CGameContext::RegisterDDRaceCommands()
 }
 
 #ifdef CONF_FDDRACE_MOD
+bool CGameContext::CheckLoadPlayer(int ClientId, bool FromSpawn)
+{
+	return m_FddraceSave.CheckLoadPlayer(ClientId, FromSpawn);
+}
+
+int CGameContext::GetRedirectListPort(int WantedSwitchNumber) const
+{
+	const char *pList = g_Config.m_SvRedirectServerTilePorts;
+	char aBuf[16];
+	while((pList = str_next_token(pList, ",", aBuf, sizeof(aBuf))))
+	{
+		int Switch = 0;
+		int Port = 0;
+		if(sscanf(aBuf, "%d:%d", &Switch, &Port) == 2 && Switch == WantedSwitchNumber)
+			return Port;
+	}
+	return 0;
+}
+
+int CGameContext::GetRedirectListSwitch(int WantedPort) const
+{
+	const char *pList = g_Config.m_SvRedirectServerTilePorts;
+	char aBuf[16];
+	while((pList = str_next_token(pList, ",", aBuf, sizeof(aBuf))))
+	{
+		int Switch = 0;
+		int Port = 0;
+		if(sscanf(aBuf, "%d:%d", &Switch, &Port) == 2 && Port == WantedPort)
+			return Switch;
+	}
+	return 0;
+}
+
+CFlag *CGameContext::GetFlag(int Team)
+{
+	if(Team != TEAM_RED && Team != TEAM_BLUE)
+		return nullptr;
+	return m_apFlags[Team];
+}
+
+int CGameContext::HasFlag(CCharacter *pChr)
+{
+	if(!pChr)
+		return -1;
+	for(int i = 0; i < 2; i++)
+	{
+		if(m_apFlags[i] && m_apFlags[i]->GetCarrier() == pChr)
+			return i;
+	}
+	return -1;
+}
+
+void CGameContext::ForceFlagOwner(int ClientId, int Team)
+{
+	if(Team != TEAM_RED && Team != TEAM_BLUE)
+		return;
+	CFlag *pFlag = m_apFlags[Team];
+	CCharacter *pChr = GetPlayerChar(ClientId);
+	if(!pFlag || (!pChr && ClientId >= 0))
+		return;
+	if(ClientId >= 0 && HasFlag(pChr) == -1)
+	{
+		if(pFlag->GetCarrier())
+			pFlag->SetLastCarrier(pFlag->GetCarrier()->GetPlayer()->GetCid());
+		pFlag->Grab(ClientId);
+		pFlag->m_Pos = pChr->GetPos();
+		pFlag->SetPrevPos(pChr->GetPos());
+	}
+	else if(ClientId == -1)
+		pFlag->Reset();
+}
+
 void CGameContext::ConFddraceCompatNotImplemented(IConsole::IResult *pResult, void *pUserData)
 {
 	(void)pResult;
@@ -4462,6 +4898,16 @@ void CGameContext::RegisterChatCommands()
 	Console()->Register("hitothers", "?s['all'|'hammer'|'shotgun'|'grenade'|'laser']", CFGFLAG_CHAT | CMDFLAG_PRACTICE, ConPracticeToggleHitOthers, this, "Toggles hit others");
 
 	Console()->Register("kill", "", CFGFLAG_CHAT | CFGFLAG_SERVER, ConProtectedKill, this, "Kill yourself when kill-protected during a long game (use f1, kill for regular kill)");
+
+#ifdef CONF_FDDRACE_MOD
+	Console()->Register("leave", "", CFGFLAG_CHAT | CFGFLAG_SERVER, ConLeaveMinigame, this, "Leaves the current minigame");
+	Console()->Register("block", "", CFGFLAG_CHAT | CFGFLAG_SERVER, ConJoinBlock, this, "Joins the block minigame");
+	Console()->Register("survival", "", CFGFLAG_CHAT | CFGFLAG_SERVER, ConJoinSurvival, this, "Joins the survival minigame");
+	Console()->Register("boomfng", "?i[team]", CFGFLAG_CHAT | CFGFLAG_SERVER, ConJoinBoomFNG, this, "Joins the boom fng minigame. Use /boomfng <team> to join a specific room");
+	Console()->Register("fng", "?i[team]", CFGFLAG_CHAT | CFGFLAG_SERVER, ConJoinFNG, this, "Joins the fng minigame. Use /fng <team> to join a specific room");
+	Console()->Register("1vs1", "?s[playername] ?i[stake] ?i[scorelimit] ?i[killborder]", CFGFLAG_CHAT | CFGFLAG_SERVER, Con1VS1, this, "Joins the 1vs1 minigame or accepts/creates a fight/new arena");
+	Console()->Register("durak", "", CFGFLAG_CHAT | CFGFLAG_SERVER, ConJoinDurak, this, "Joins the durak minigame");
+#endif
 }
 
 void CGameContext::OnInit(const void *pPersistentData)
@@ -4672,6 +5118,32 @@ void CGameContext::OnInit(const void *pPersistentData)
 
 #ifdef CONF_FDDRACE_MOD
 	m_Accounts.Init(this);
+	m_FddraceSave.Init(this);
+	m_FddraceSave.OnMapLoaded();
+	InitPlots();
+	InitMinigames();
+
+	static const int s_aTaserPrice[NUM_TASER_LEVELS] = {50000, 75000, 100000, 150000, 200000, 200000, 200000, 300000, 300000, 400000};
+	static const int s_aPoliceLevel[NUM_POLICE_LEVELS] = {18, 25, 30, 40, 50};
+	for(int i = 0; i < NUM_TASER_LEVELS; i++)
+		m_aTaserPrice[i] = s_aTaserPrice[i];
+	for(int i = 0; i < NUM_POLICE_LEVELS; i++)
+		m_aPoliceLevel[i] = s_aPoliceLevel[i];
+
+	for(int i = 0; i < NUM_HOUSES; i++)
+	{
+		delete m_pHouses[i];
+		m_pHouses[i] = nullptr;
+	}
+	m_pHouses[HOUSE_SHOP] = new CShop(this, HOUSE_SHOP);
+	m_pHouses[HOUSE_PLOT_SHOP] = new CShop(this, HOUSE_PLOT_SHOP);
+	m_pHouses[HOUSE_BANK] = new CBank(this);
+	m_pHouses[HOUSE_TAVERN] = new CTavern(this);
+	m_VotingMenu.Init(this);
+
+	// Post-map: disable minigames without required tiles
+	m_aMinigameDisabled[MINIGAME_BLOCK] = !Collision()->HasModTile(TILE_MINIGAME_BLOCK);
+	m_aMinigameDisabled[MINIGAME_1VS1] = !Collision()->HasModTile(TILE_1VS1_LOBBY);
 #endif
 }
 
@@ -4680,6 +5152,11 @@ void CGameContext::CreateAllEntities(bool Initial)
 	const CTile *pTiles = m_Collision.GameLayer();
 	const CTile *pFront = m_Collision.FrontLayer();
 	const CSwitchTile *pSwitch = m_Collision.SwitchLayer();
+
+#ifdef CONF_FDDRACE_MOD
+	if(Initial)
+		m_Collision.ClearModTiles();
+#endif
 
 	for(int y = 0; y < m_Collision.GetHeight(); y++)
 	{
@@ -4690,6 +5167,10 @@ void CGameContext::CreateAllEntities(bool Initial)
 			// Game layer
 			{
 				const int GameIndex = pTiles[Index].m_Index;
+#ifdef CONF_FDDRACE_MOD
+				if(Initial && GameIndex > 0)
+					m_Collision.CollectModTile(GameIndex, vec2(x * 32.0f + 16.0f, y * 32.0f + 16.0f));
+#endif
 				if(GameIndex == TILE_OLDLASER)
 				{
 					g_Config.m_SvOldLaser = 1;
@@ -4765,12 +5246,37 @@ void CGameContext::CreateAllEntities(bool Initial)
 				// DDNet relative entities (192 → ENTITY_SPAWN).
 				if(CCollision::IsPlotTile(SwitchType) ||
 					SwitchType == TILE_SWITCH_REDIRECT_SERVER_FROM ||
-					SwitchType == TILE_SWITCH_REDIRECT_SERVER_TO)
+					SwitchType == TILE_SWITCH_REDIRECT_SERVER_TO ||
+					SwitchType == TILE_SWITCH_HELICOPTER_SPAWN)
 				{
 					if(Initial && SwitchType == TILE_SWITCH_PLOT)
 					{
 						dbg_msg("fddrace", "plot tile at (%d,%d) switch=%d plot=%d",
 							x, y, pSwitch[Index].m_Number, m_Collision.GetPlotBySwitch(pSwitch[Index].m_Number));
+					}
+					else if(Initial && SwitchType == TILE_SWITCH_REDIRECT_SERVER_TO && pSwitch[Index].m_Number > 0)
+					{
+						const vec2 Pos(x * 32.0f + 16.0f, y * 32.0f + 16.0f);
+						const int Delay = m_Collision.GetSwitchDelay(Index);
+						if(Delay == 0)
+						{
+							CCollision::SRedirectTile RedirectTile;
+							RedirectTile.m_Number = pSwitch[Index].m_Number;
+							RedirectTile.m_Pos = Pos;
+							m_Collision.m_vRedirectTiles.push_back(RedirectTile);
+						}
+						else
+						{
+							const int Port = GetRedirectListPort(pSwitch[Index].m_Number);
+							if(Port > 0)
+								new CPlayerCounter(&m_World, Pos, Port);
+						}
+					}
+					else if(Initial && SwitchType == TILE_SWITCH_HELICOPTER_SPAWN)
+					{
+						const vec2 Pos(x * 32.0f + 16.0f, y * 32.0f + 16.0f);
+						const int Delay = m_Collision.GetSwitchDelay(Index);
+						SpawnHelicopter(Pos, Delay, true, pSwitch[Index].m_Number);
 					}
 				}
 				else
@@ -4934,6 +5440,7 @@ bool CGameContext::OnMapChange(char *pNewMapName, int MapNameSize)
 void CGameContext::OnShutdown(void *pPersistentData)
 {
 #ifdef CONF_FDDRACE_MOD
+	m_FddraceSave.OnShutdown();
 	m_Accounts.Shutdown();
 #endif
 
@@ -5031,6 +5538,14 @@ void CGameContext::OnSnap(int ClientId, bool GlobalSnap, bool RecordingDemo)
 		if(pPlayer)
 			pPlayer->Snap(ClientId);
 	}
+
+#ifdef CONF_FDDRACE_MOD
+	for(int i = 0; i < NUM_MINIGAMES; i++)
+	{
+		if(m_pMinigames[i])
+			m_pMinigames[i]->Snap(ClientId);
+	}
+#endif
 
 	if(ClientId > -1)
 		m_apPlayers[ClientId]->FakeSnap();
@@ -5859,6 +6374,387 @@ void CGameContext::ReinitPlayerMap(int ClientId, bool Timeout)
 }
 
 #ifdef CONF_FDDRACE_MOD
+void CGameContext::InitMinigames()
+{
+	for(int i = 0; i < NUM_MINIGAMES; i++)
+	{
+		delete m_pMinigames[i];
+		m_pMinigames[i] = nullptr;
+	}
+	m_pMinigames[MINIGAME_BLOCK] = new CMinigame(this, MINIGAME_BLOCK);
+	m_pMinigames[MINIGAME_SURVIVAL] = new CSurvival(this);
+	m_pMinigames[MINIGAME_1VS1] = new CArenas(this);
+	m_pMinigames[MINIGAME_DURAK] = new CDurak(this);
+	m_pMinigames[MINIGAME_INSTAGIB_BOOMFNG] = new CFng(this, MINIGAME_INSTAGIB_BOOMFNG);
+	m_pMinigames[MINIGAME_INSTAGIB_FNG] = new CFng(this, MINIGAME_INSTAGIB_FNG);
+
+	for(int i = 0; i < NUM_MINIGAMES; i++)
+		m_aMinigameDisabled[i] = false;
+	// Durak validated when table tiles are collected
+	m_aMinigameDisabled[MINIGAME_DURAK] = true;
+}
+
+const char *CGameContext::GetMinigameName(int Minigame)
+{
+	switch(Minigame)
+	{
+	case MINIGAME_NONE: return "None";
+	case MINIGAME_BLOCK: return "Block";
+	case MINIGAME_SURVIVAL: return "Survival";
+	case MINIGAME_INSTAGIB_BOOMFNG: return "Instagib Boom FNG";
+	case MINIGAME_INSTAGIB_FNG: return "Instagib FNG";
+	case MINIGAME_1VS1: return "1vs1";
+	case MINIGAME_DURAK: return "Durák";
+	}
+	return "Unknown";
+}
+
+const char *CGameContext::GetMinigameCommand(int Minigame)
+{
+	switch(Minigame)
+	{
+	case MINIGAME_NONE: return "none";
+	case MINIGAME_BLOCK: return "block";
+	case MINIGAME_SURVIVAL: return "survival";
+	case MINIGAME_INSTAGIB_BOOMFNG: return "boomfng";
+	case MINIGAME_INSTAGIB_FNG: return "fng";
+	case MINIGAME_1VS1: return "1vs1";
+	case MINIGAME_DURAK: return "durak";
+	}
+	return "unknown";
+}
+
+void CGameContext::UpdateHidePlayers(int UpdateId)
+{
+	if(UpdateId == -1)
+	{
+		for(int i = 0; i < MAX_CLIENTS; i++)
+			UpdateHidePlayers(i);
+		return;
+	}
+
+	if(!m_apPlayers[UpdateId])
+		return;
+
+	for(int i = 0; i < MAX_CLIENTS; i++)
+	{
+		if(i == UpdateId || !m_apPlayers[i] || m_apPlayers[UpdateId]->GetTeam() == TEAM_SPECTATORS)
+			continue;
+
+		int Team = m_apPlayers[UpdateId]->GetHidePlayerTeam(i);
+
+		if(m_apPlayers[i]->m_HidePlayerTeam[UpdateId] == Team)
+			continue;
+
+		m_apPlayers[i]->m_HidePlayerTeam[UpdateId] = Team;
+		SendTeamChange(UpdateId, Team, true, Server()->Tick(), i);
+	}
+}
+
+void CGameContext::SendTeamChange(int ClientId, int Team, bool Silent, int CooldownTick, int ToClientId)
+{
+	protocol7::CNetMsg_Sv_Team Msg;
+	Msg.m_ClientId = ClientId;
+	Msg.m_Team = Team;
+	Msg.m_Silent = Silent ? 1 : 0;
+	Msg.m_CooldownTick = CooldownTick;
+	Server()->SendPackMsg(&Msg, MSGFLAG_VITAL | MSGFLAG_NORECORD, ToClientId);
+}
+
+bool CGameContext::IsTuneInList(LOCKED_TUNES *pLockedTunings, const char *pParam)
+{
+	return std::any_of(pLockedTunings->begin(), pLockedTunings->end(),
+		[pParam](const CLockedTune &Tune) {
+			return str_comp(Tune.m_aParam, pParam) == 0;
+		});
+}
+
+int CGameContext::SetLockedTune(LOCKED_TUNES *pLockedTunings, CLockedTune &Tune, bool AllowGlobalValues)
+{
+	float GlobalValue;
+	if(!Tuning()->Get(Tune.m_aParam, &GlobalValue))
+		return 0;
+
+	bool IsGlobalValue = Tune.m_Value.Get() == (int)(GlobalValue * 100.f);
+	for(unsigned int i = 0; i < pLockedTunings->size(); i++)
+	{
+		if(str_comp_nocase(pLockedTunings->at(i).m_aParam, Tune.m_aParam) == 0)
+		{
+			if(IsGlobalValue)
+			{
+				pLockedTunings->erase(pLockedTunings->begin() + i);
+				return 3;
+			}
+			pLockedTunings->at(i).m_Value = Tune.m_Value;
+			return 2;
+		}
+	}
+
+	if(IsGlobalValue && !AllowGlobalValues)
+		return 0;
+
+	pLockedTunings->push_back(Tune);
+	return 1;
+}
+
+CTuningParams *CGameContext::ApplyLockedTunings(CTuningParams *pTuning, LOCKED_TUNES &LockedTunings)
+{
+	static CTuningParams Tuning;
+	Tuning = *pTuning;
+	for(unsigned int i = 0; i < LockedTunings.size(); i++)
+		Tuning.Set(LockedTunings[i].m_aParam, (float)LockedTunings[i].m_Value);
+	return &Tuning;
+}
+
+
+void CGameContext::SetMinigame(int ClientId, int Minigame, bool Force, bool DoChatMsg)
+{
+	CPlayer *pPlayer = m_apPlayers[ClientId];
+	if(!pPlayer)
+		return;
+
+	char aMsg[128];
+
+	if(Minigame != MINIGAME_NONE && Minigame >= 0 && Minigame < NUM_MINIGAMES && m_aMinigameDisabled[Minigame])
+	{
+		if(DoChatMsg)
+			SendChatTarget(ClientId, pPlayer->Localize("This minigame is disabled"));
+		return;
+	}
+
+	if(pPlayer->m_Minigame == Minigame)
+	{
+		if(DoChatMsg)
+		{
+			if(Minigame == MINIGAME_NONE)
+				SendChatTarget(ClientId, pPlayer->Localize("You are not in a minigame"));
+			else
+			{
+				str_format(aMsg, sizeof(aMsg), pPlayer->Localize("You are already in minigame '%s'"), GetMinigameName(Minigame));
+				SendChatTarget(ClientId, aMsg);
+			}
+		}
+		return;
+	}
+
+	if(!Force)
+	{
+		if(Minigame == MINIGAME_DURAK && !Collision()->HasModTile(TILE_DURAK_LOBBY))
+		{
+			SendChatTarget(ClientId, pPlayer->Localize("This map has no Durák lobby, you have to find your way to the table yourself"));
+			return;
+		}
+		else if(pPlayer->RequestMinigameChange(Minigame))
+		{
+			return;
+		}
+	}
+
+	if(Minigame == MINIGAME_NONE)
+	{
+		if(DoChatMsg)
+		{
+			SendChatFormat(-1, TEAM_ALL, -1, CHATFLAG_ALL, Localizable("'%s' left the minigame '%s'"),
+				Server()->ClientName(ClientId), GetMinigameName(pPlayer->m_Minigame));
+		}
+
+		if(pPlayer->m_Minigame == MINIGAME_SURVIVAL)
+			Survival()->OnPlayerLeave(ClientId);
+		else if(pPlayer->m_Minigame == MINIGAME_1VS1)
+			Arenas()->OnPlayerLeave(ClientId);
+		else if(pPlayer->m_Minigame == MINIGAME_DURAK)
+			Durak()->OnPlayerLeave(ClientId);
+		else if(pPlayer->m_Minigame == MINIGAME_INSTAGIB_FNG || pPlayer->m_Minigame == MINIGAME_INSTAGIB_BOOMFNG)
+			((CFng *)m_pMinigames[pPlayer->m_Minigame])->OnPlayerLeave(ClientId);
+	}
+	else if(!pPlayer->IsMinigame())
+	{
+		if(DoChatMsg)
+		{
+			SendChatFormat(-1, TEAM_ALL, -1, CHATFLAG_ALL, Localizable("'%s' joined the minigame '%s', use '/%s' to join aswell"),
+				Server()->ClientName(ClientId), GetMinigameName(Minigame), GetMinigameCommand(Minigame));
+			SendChatTarget(ClientId, pPlayer->Localize("Say '/leave' to join the normal area again"));
+		}
+
+		pPlayer->SaveMinigameTee();
+
+		if(Minigame != MINIGAME_DURAK && Minigame != MINIGAME_INSTAGIB_FNG && Minigame != MINIGAME_INSTAGIB_BOOMFNG)
+			m_pController->Teams().SetForceCharacterTeam(ClientId, 0);
+
+		if(Minigame == MINIGAME_SURVIVAL)
+			Survival()->OnPlayerJoin(ClientId);
+		else if(Minigame == MINIGAME_1VS1)
+			Arenas()->OnPlayerJoin(ClientId);
+		else if(Minigame == MINIGAME_INSTAGIB_FNG || Minigame == MINIGAME_INSTAGIB_BOOMFNG)
+			((CFng *)m_pMinigames[Minigame])->OnPlayerJoin(ClientId, Minigame);
+	}
+	else
+	{
+		SendChatTarget(ClientId, pPlayer->Localize("You have to leave first in order to join another minigame"));
+		return;
+	}
+
+	pPlayer->KillCharacter(CPlayer::WEAPON_MINIGAME_CHANGE);
+	pPlayer->m_Minigame = Minigame;
+	pPlayer->SetPlaying();
+	pPlayer->m_LastMovementTick = Server()->Tick();
+
+	UpdateHidePlayers();
+	m_pController->UpdateGameInfo(ClientId);
+}
+
+void CGameContext::InstagibTick(int Type)
+{
+	Type = Type == 0 ? MINIGAME_INSTAGIB_BOOMFNG : MINIGAME_INSTAGIB_FNG;
+	if(!m_pMinigames[Type])
+		return;
+	((CFng *)m_pMinigames[Type])->Tick();
+
+	if(!Collision()->HasModTile(ENTITY_SPAWN_RED) && !Collision()->HasModTile(ENTITY_SPAWN_BLUE))
+	{
+		m_aMinigameDisabled[Type] = true;
+		return;
+	}
+	m_aMinigameDisabled[Type] = false;
+}
+
+void CGameContext::ConLeaveMinigame(IConsole::IResult *pResult, void *pUserData)
+{
+	CGameContext *pSelf = (CGameContext *)pUserData;
+	if(!CheckClientId(pResult->m_ClientId))
+		return;
+	CPlayer *pPlayer = pSelf->m_apPlayers[pResult->m_ClientId];
+	if(!pPlayer)
+		return;
+
+	if(pPlayer->m_Minigame == MINIGAME_1VS1 && pSelf->Arenas() && pSelf->Arenas()->FightStarted(pResult->m_ClientId))
+		pSelf->Arenas()->OnPlayerLeave(pResult->m_ClientId);
+	else
+		pSelf->SetMinigame(pResult->m_ClientId, MINIGAME_NONE);
+}
+
+void CGameContext::ConJoinBlock(IConsole::IResult *pResult, void *pUserData)
+{
+	CGameContext *pSelf = (CGameContext *)pUserData;
+	if(!CheckClientId(pResult->m_ClientId))
+		return;
+	pSelf->SetMinigame(pResult->m_ClientId, MINIGAME_BLOCK);
+}
+
+void CGameContext::ConJoinSurvival(IConsole::IResult *pResult, void *pUserData)
+{
+	CGameContext *pSelf = (CGameContext *)pUserData;
+	if(!CheckClientId(pResult->m_ClientId))
+		return;
+	pSelf->SetMinigame(pResult->m_ClientId, MINIGAME_SURVIVAL);
+}
+
+void CGameContext::ConJoinBoomFNG(IConsole::IResult *pResult, void *pUserData)
+{
+	CGameContext *pSelf = (CGameContext *)pUserData;
+	if(!CheckClientId(pResult->m_ClientId))
+		return;
+	CPlayer *pPlayer = pSelf->m_apPlayers[pResult->m_ClientId];
+	if(!pPlayer)
+		return;
+
+	const int ClientId = pResult->m_ClientId;
+	const bool AlreadyInLobby = pPlayer->m_Minigame == MINIGAME_INSTAGIB_BOOMFNG;
+	if(!AlreadyInLobby)
+	{
+		pSelf->SetMinigame(ClientId, MINIGAME_INSTAGIB_BOOMFNG);
+		return;
+	}
+
+	if(pResult->NumArguments() > 0)
+	{
+		const int TeamNum = pResult->GetInteger(0);
+		if(TeamNum > 0)
+		{
+			((CFng *)pSelf->m_pMinigames[MINIGAME_INSTAGIB_BOOMFNG])->OnTeamCommand(ClientId, TeamNum);
+			return;
+		}
+	}
+
+	((CFng *)pSelf->m_pMinigames[MINIGAME_INSTAGIB_BOOMFNG])->CreateNewRoom(ClientId);
+}
+
+void CGameContext::ConJoinFNG(IConsole::IResult *pResult, void *pUserData)
+{
+	CGameContext *pSelf = (CGameContext *)pUserData;
+	if(!CheckClientId(pResult->m_ClientId))
+		return;
+	CPlayer *pPlayer = pSelf->m_apPlayers[pResult->m_ClientId];
+	if(!pPlayer)
+		return;
+
+	const int ClientId = pResult->m_ClientId;
+	const bool AlreadyInLobby = pPlayer->m_Minigame == MINIGAME_INSTAGIB_FNG;
+	if(!AlreadyInLobby)
+	{
+		pSelf->SetMinigame(ClientId, MINIGAME_INSTAGIB_FNG);
+		return;
+	}
+
+	if(pResult->NumArguments() > 0)
+	{
+		const int TeamNum = pResult->GetInteger(0);
+		if(TeamNum > 0)
+		{
+			((CFng *)pSelf->m_pMinigames[MINIGAME_INSTAGIB_FNG])->OnTeamCommand(ClientId, TeamNum);
+			return;
+		}
+	}
+
+	((CFng *)pSelf->m_pMinigames[MINIGAME_INSTAGIB_FNG])->CreateNewRoom(ClientId);
+}
+
+void CGameContext::ConJoinDurak(IConsole::IResult *pResult, void *pUserData)
+{
+	CGameContext *pSelf = (CGameContext *)pUserData;
+	if(!CheckClientId(pResult->m_ClientId))
+		return;
+	pSelf->SetMinigame(pResult->m_ClientId, MINIGAME_DURAK);
+}
+
+void CGameContext::Con1VS1(IConsole::IResult *pResult, void *pUserData)
+{
+	CGameContext *pSelf = (CGameContext *)pUserData;
+	if(!CheckClientId(pResult->m_ClientId))
+		return;
+	CPlayer *pPlayer = pSelf->m_apPlayers[pResult->m_ClientId];
+	if(!pPlayer)
+		return;
+
+	if(pPlayer->m_Minigame != MINIGAME_1VS1 || !pResult->NumArguments())
+	{
+		pSelf->SetMinigame(pResult->m_ClientId, MINIGAME_1VS1);
+		return;
+	}
+
+	const int OtherId = pSelf->FindClientIdByName(pResult->GetString(0)).value_or(-1);
+	if(OtherId < 0)
+	{
+		pSelf->SendChatTarget(pResult->m_ClientId, pPlayer->Localize("Player not found"));
+		return;
+	}
+
+	int64_t Stake = 0;
+	int ScoreLimit = 10;
+	int KillBorder = 0;
+	if(pResult->NumArguments() > 1)
+		Stake = pResult->GetInteger(1);
+	if(pResult->NumArguments() > 2)
+		ScoreLimit = pResult->GetInteger(2);
+	if(pResult->NumArguments() > 3)
+		KillBorder = pResult->GetInteger(3);
+
+	if(pSelf->Arenas()->AcceptFight(OtherId, pResult->m_ClientId, Stake))
+		return;
+
+	pSelf->Arenas()->StartConfiguration(pResult->m_ClientId, OtherId, Stake, ScoreLimit, KillBorder != 0);
+}
+
 void CGameContext::HandleDiscordMessage(const char *pUsername, const char *pUserID, const char *pText, const char *pEvent)
 {
 	(void)pUserID;

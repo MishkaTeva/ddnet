@@ -392,6 +392,8 @@ public:
 	virtual bool IsClientTClientVerified(int ClientId) const = 0;
 	virtual bool IsClientHardcodedHash(int ClientId) const = 0;
 	virtual bool IsOldClient(int ClientId) const = 0;
+	virtual bool IsMain(int ClientId) const = 0;
+	virtual int GetDummy(int ClientId) const = 0;
 	virtual class CAntiCheat *AntiCheat() = 0;
 };
 

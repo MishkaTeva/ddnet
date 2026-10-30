@@ -13,8 +13,9 @@
 #include <game/server/gamecontext.h>
 #include <game/server/gamemodes/ddnet.h>
 #include <game/server/player.h>
+#include <game/weapons_ex.h>
 
-CLaser::CLaser(CGameWorld *pGameWorld, vec2 Pos, vec2 Direction, float StartEnergy, int Owner, int Type) :
+CLaser::CLaser(CGameWorld *pGameWorld, vec2 Pos, vec2 Direction, float StartEnergy, int Owner, int Type, int TaserStrength) :
 	CEntity(pGameWorld, CGameWorld::ENTTYPE_LASER, true)
 {
 	m_Pos = Pos;
@@ -31,6 +32,7 @@ CLaser::CLaser(CGameWorld *pGameWorld, vec2 Pos, vec2 Direction, float StartEner
 	m_TeleportCancelled = false;
 	m_IsBlueTeleport = false;
 	m_ZeroEnergyBounceInLastTick = false;
+	m_TaserStrength = TaserStrength;
 	m_TuneZone = GameServer()->Collision()->IsTune(GameServer()->Collision()->GetMapIndex(m_Pos));
 	CCharacter *pOwnerChar = GameServer()->GetPlayerChar(m_Owner);
 	m_BelongsToPracticeTeam = pOwnerChar && pOwnerChar->Teams()->IsPractice(pOwnerChar->Team());
@@ -51,7 +53,7 @@ bool CLaser::HitCharacter(vec2 From, vec2 To)
 	CCharacter *pHit;
 	bool pDontHitSelf = g_Config.m_SvOldLaser || (m_Bounces == 0 && !m_WasTele);
 
-	if(pOwnerChar ? (!pOwnerChar->LaserHitDisabled() && m_Type == WEAPON_LASER) || (!pOwnerChar->ShotgunHitDisabled() && m_Type == WEAPON_SHOTGUN) : g_Config.m_SvHit)
+	if(pOwnerChar ? (!pOwnerChar->LaserHitDisabled() && (m_Type == WEAPON_LASER || m_Type == WEAPON_TASER)) || (!pOwnerChar->ShotgunHitDisabled() && m_Type == WEAPON_SHOTGUN) : g_Config.m_SvHit)
 		pHit = GameWorld()->IntersectCharacter(m_Pos, To, 0.f, At, pDontHitSelf ? pOwnerChar : nullptr, m_Owner);
 	else
 		pHit = GameWorld()->IntersectCharacter(m_Pos, To, 0.f, At, pDontHitSelf ? pOwnerChar : nullptr, m_Owner, pOwnerChar);
@@ -97,9 +99,19 @@ bool CLaser::HitCharacter(vec2 From, vec2 To)
 	{
 		pHit->Unfreeze();
 	}
+#ifdef CONF_FDDRACE_MOD
+	else if(m_Type == WEAPON_TASER)
+	{
+		const float Seconds = std::max(1.f, m_TaserStrength / 10.f);
+		pHit->Freeze((int)Seconds);
+	}
+	pHit->TakeDamage(vec2(0, 0), 0, m_Owner, m_Type == WEAPON_TASER ? WEAPON_LASER : m_Type);
+#else
 	pHit->TakeDamage(vec2(0, 0), 0, m_Owner, m_Type);
+#endif
 	return true;
 }
+
 
 void CLaser::DoBounce()
 {
@@ -290,7 +302,7 @@ void CLaser::Snap(int SnappingClient)
 		return;
 
 	int SnappingClientVersion = GameServer()->GetClientVersion(SnappingClient);
-	int LaserType = m_Type == WEAPON_LASER ? LASERTYPE_RIFLE : (m_Type == WEAPON_SHOTGUN ? LASERTYPE_SHOTGUN : -1);
+	int LaserType = m_Type == WEAPON_LASER ? LASERTYPE_RIFLE : (m_Type == WEAPON_SHOTGUN ? LASERTYPE_SHOTGUN : (m_Type == WEAPON_TASER ? LASERTYPE_FREEZE : -1));
 
 	GameServer()->SnapLaserObject(CSnapContext(SnappingClientVersion, Server()->IsSixup(SnappingClient), SnappingClient), GetId().value(),
 		m_Pos, m_From, m_EvalTick, m_Owner, LaserType, 0, m_Number);

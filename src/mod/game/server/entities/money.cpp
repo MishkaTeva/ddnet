@@ -82,6 +82,7 @@ void CMoney::Tick()
 				str_format(aBuf, sizeof(aBuf), "+%lld", (long long)m_Amount);
 				GameServer()->CreateLaserText(m_Pos, pClosest->GetPlayer()->GetCid(), aBuf, 3);
 				GameServer()->CreateSound(m_Pos, SOUND_HOOK_LOOP, pClosest->TeamMask());
+				pClosest->GetPlayer()->WalletTransaction(m_Amount);
 				m_MarkedForDestroy = true;
 				return;
 			}

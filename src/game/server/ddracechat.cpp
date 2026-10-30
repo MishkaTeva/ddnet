@@ -559,6 +559,10 @@ void CGameContext::ConTimeout(IConsole::IResult *pResult, void *pUserData)
 
 	pSelf->Server()->SetTimeoutProtected(pResult->m_ClientId);
 	str_copy(pPlayer->m_aTimeoutCode, pResult->GetString(0));
+#ifdef CONF_FDDRACE_MOD
+	if(!pPlayer->m_LoadedSavedPlayer && pPlayer->GetCharacter())
+		pSelf->CheckLoadPlayer(pResult->m_ClientId, true);
+#endif
 }
 
 void CGameContext::ConPractice(IConsole::IResult *pResult, void *pUserData)

@@ -74,6 +74,7 @@ public: // TODO: Maybe make protected
 	CEntity *TypeNext() { return m_pNextTypeEntity; }
 	CEntity *TypePrev() { return m_pPrevTypeEntity; }
 	const vec2 &GetPos() const { return m_Pos; }
+	int GetObjType() const { return m_ObjType; }
 	float GetProximityRadius() const { return m_ProximityRadius; }
 
 	/* Other functions */
@@ -180,6 +181,13 @@ public: // TODO: Maybe make protected
 
 	int m_Number;
 	int m_Layer;
+
+#ifdef CONF_FDDRACE_MOD
+	// Draweditor brush preview: -1 = normal entity, else owner ClientId
+	int m_BrushCID = -1;
+	// Plot ownership: -1 = map entity (not removable), 0 = free draw, >=1 = plot id
+	int m_PlotID = -1;
+#endif
 };
 
 bool NetworkClipped(const CGameContext *pGameServer, int SnappingClient, vec2 CheckPos);

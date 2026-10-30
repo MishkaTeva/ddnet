@@ -10,15 +10,25 @@ class CDoor : public CEntity
 {
 	vec2 m_To;
 	void ResetCollision();
+	void ClearCollision();
 	int m_Length;
+	float m_Rotation;
 	vec2 m_Direction;
+	bool m_Collision;
 
 public:
 	CDoor(CGameWorld *pGameWorld, vec2 Pos, float Rotation, int Length,
-		int Number);
+		int Number, bool Collision = true);
+	~CDoor() override;
 
 	void Reset() override;
 	void Snap(int SnappingClient) override;
+
+	float GetRotation() const { return m_Rotation; }
+	int GetLength() const { return m_Length; }
+	void SetDirection(float Rotation);
+	void SetLength(int Length);
+	void UpdateEndpoint();
 };
 
 #endif // GAME_SERVER_ENTITIES_DOOR_H

@@ -122,6 +122,7 @@ bool IsValidSwitchTile(int Index)
 		Index == TILE_SWITCH_PLOT_TOTELE ||
 		Index == TILE_SWITCH_REDIRECT_SERVER_FROM ||
 		Index == TILE_SWITCH_REDIRECT_SERVER_TO ||
+		Index == TILE_SWITCH_HELICOPTER_SPAWN ||
 #endif
 		(IsValidEntity(Index) && Index >= ENTITY_OFFSET + ENTITY_ARMOR_1));
 }

@@ -7,6 +7,11 @@
 #include <game/server/entity.h>
 #include <game/server/save.h>
 
+#ifdef CONF_FDDRACE_MOD
+#include <game/gamecore.h>
+#include <mod/game/server/draweditor.h>
+#endif
+
 class CPlayer;
 class CGameTeams;
 class CGameWorld;
@@ -298,17 +303,54 @@ public:
 	bool m_Atom = false;
 	bool m_Trail = false;
 	bool m_EpicCircle = false;
+	bool m_Rainbow = false;
+	bool m_Bloody = false;
 	int m_Meteors = 0;
 	bool m_IsPortalBlocker = false;
 	class CPortalBlocker *m_pPortalBlocker = nullptr;
 	class CLightsaber *m_pLightsaber = nullptr;
 	class CGrog *m_pGrog = nullptr;
+	class CHelicopter *m_pHelicopter = nullptr;
+	CDrawEditor m_DrawEditor;
 	int m_NumGrogsHolding = 0;
 	int m_LastGrogHoldMsg = 0;
+	int m_RedirectTilePort = 0;
+	int m_LastTaserUse = 0;
+	int m_LastIndexTile = 0;
+	int m_LastIndexFrontTile = 0;
 
+	// Durak / minigame stubs (full passive system not yet ported)
+	bool m_Passive = false;
+	int64_t m_PassiveEndTick = 0;
+	void EpicCircle(bool Set, int FromId = -1, bool Silent = false);
+	void Passive(bool Set, int FromId = -1, bool Silent = false);
+	bool UpdatePassiveEndTick(int64_t NewEndTick);
+	vec2 GetCursorPos() const { return m_Pos + vec2(m_LatestInput.m_TargetX, m_LatestInput.m_TargetY); }
+	const CNetObj_PlayerInput *Input() const { return &m_Input; }
+	void ForceSetPos(vec2 Pos) { SetPosition(Pos); }
+	void SetCoreVel(vec2 Vel) { m_Core.m_Vel = Vel; }
+
+	// Minigame / locked tunings
+	bool m_DeepFreeze = false;
+	bool m_IsFrozen = false;
+	LOCKED_TUNES m_LockedTunings;
+	LOCKED_TUNES m_LastLockedTunings;
+	void ApplyLockedTunings(bool SendTuningParams = true);
+	bool IsGrounded(bool CheckBorder) { (void)CheckBorder; return IsGrounded(); }
+
+	void DropFlag(int Dir = -3);
+	bool CanDropWeapon(int Type) const;
+	void DropWeapon(int WeaponId = -1, bool OnDeath = false, float Dir = -3.f);
+	bool DropGrog(float Dir = -3.f, bool OnDeath = false);
+	bool TryMountHelicopter();
+	int GetTaserStrength();
 	int GetAimDir() const { return m_Input.m_TargetX < 0 ? -1 : 1; }
+	const CNetObj_PlayerInput &GetLatestInput() const { return m_LatestInput; }
 	bool AddGrog();
 	void IncreasePermille(int Permille);
+	bool LoadRedirectTile(int Port);
+	bool TrySafelyRedirectClient(int Port, bool Force = false);
+	bool TrySafelyRedirectClientImpl(int Port);
 #endif
 };
 

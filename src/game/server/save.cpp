@@ -278,7 +278,7 @@ bool CSaveTee::Load(CCharacter *pChr, std::optional<int> Team)
 char *CSaveTee::GetString(const CSaveTeam *pTeam)
 {
 	int HookedPlayer = -1;
-	if(m_HookedPlayer != -1)
+	if(m_HookedPlayer != -1 && pTeam)
 	{
 		for(int n = 0; n < pTeam->GetMembersCount(); n++)
 		{

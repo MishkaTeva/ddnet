@@ -16,6 +16,8 @@
 
 #include <algorithm>
 #include <cmath>
+#include <cstdlib>
+#include <vector>
 
 vec2 ClampVel(int MoveRestriction, vec2 Vel)
 {
@@ -199,6 +201,8 @@ void CCollision::Unload()
 
 #ifdef CONF_FDDRACE_MOD
 	m_NumPlots = 0;
+	m_vRedirectTiles.clear();
+	ClearModTiles();
 #endif
 
 	m_TeleIns.clear();
@@ -1382,6 +1386,13 @@ bool CCollision::IsPlotTile(int Index)
 	return Index == TILE_SWITCH_PLOT || Index == TILE_SWITCH_PLOT_DOOR || Index == TILE_SWITCH_PLOT_TOTELE;
 }
 
+int CCollision::GetPlotID(int Index) const
+{
+	if(Index >= 0 && m_pSwitch && m_pSwitch[Index].m_Type == TILE_SWITCH_PLOT && m_pSwitch[Index].m_Number > 0)
+		return GetPlotBySwitch(m_pSwitch[Index].m_Number);
+	return 0;
+}
+
 int CCollision::GetSwitchByPlot(int PlotId) const
 {
 	if(PlotId <= 0 || PlotId > m_NumPlots)
@@ -1412,6 +1423,109 @@ void CCollision::SetTeleporter(vec2 Pos, int Type, int Number)
 
 	m_pTele[Index].m_Number = (unsigned char)Number;
 	m_pTele[Index].m_Type = (unsigned char)Type;
+}
+
+vec2 CCollision::GetRandomRedirectTile(int Number) const
+{
+	std::vector<vec2> vPos;
+	for(const SRedirectTile &Tile : m_vRedirectTiles)
+	{
+		if(Tile.m_Number == Number)
+			vPos.push_back(Tile.m_Pos);
+	}
+	if(vPos.empty())
+		return vec2(-1, -1);
+	return vPos[rand() % vPos.size()];
+}
+
+bool CCollision::AddDoorTile(int Index, int Type, int Number, int Flags)
+{
+	if(Index < 0 || !m_pDoor || Index >= m_Width * m_Height)
+		return false;
+	if(m_pDoor[Index].m_Index && m_pDoor[Index].m_Number != (unsigned char)Number)
+		return false;
+	m_pDoor[Index].m_Index = (unsigned char)Type;
+	m_pDoor[Index].m_Flags = (unsigned char)Flags;
+	m_pDoor[Index].m_Number = (unsigned char)Number;
+	return true;
+}
+
+bool CCollision::RemoveDoorTile(int Index, int Type, int Number)
+{
+	if(Index < 0 || !m_pDoor || Index >= m_Width * m_Height)
+		return false;
+	if(m_pDoor[Index].m_Index != (unsigned char)Type || m_pDoor[Index].m_Number != (unsigned char)Number)
+		return false;
+	m_pDoor[Index].m_Index = 0;
+	m_pDoor[Index].m_Flags = 0;
+	m_pDoor[Index].m_Number = 0;
+	return true;
+}
+
+void CCollision::SetSpeedup(vec2 Pos, int Angle, int Force, int MaxSpeed)
+{
+	if(!m_pSpeedup)
+		return;
+	const int Nx = std::clamp(round_to_int(Pos.x) / 32, 0, m_Width - 1);
+	const int Ny = std::clamp(round_to_int(Pos.y) / 32, 0, m_Height - 1);
+	const int Index = Ny * m_Width + Nx;
+	m_pSpeedup[Index].m_Angle = (short)Angle;
+	m_pSpeedup[Index].m_Force = (unsigned char)std::clamp(Force, 0, 255);
+	m_pSpeedup[Index].m_MaxSpeed = (unsigned char)std::clamp(MaxSpeed, 0, 255);
+	m_pSpeedup[Index].m_Type = Force ? TILE_SPEED_BOOST : 0;
+}
+
+void CCollision::ClearModTiles()
+{
+	m_vJailTiles.clear();
+	m_vJailReleaseTiles.clear();
+}
+
+void CCollision::CollectModTile(int Index, vec2 Pos)
+{
+	if(Index == TILE_JAIL)
+		m_vJailTiles.push_back(Pos);
+	else if(Index == TILE_JAIL_RELEASE)
+		m_vJailReleaseTiles.push_back(Pos);
+}
+
+vec2 CCollision::GetRandomModTile(int TileIndex) const
+{
+	const std::vector<vec2> *pTiles = nullptr;
+	if(TileIndex == TILE_JAIL)
+		pTiles = &m_vJailTiles;
+	else if(TileIndex == TILE_JAIL_RELEASE)
+		pTiles = &m_vJailReleaseTiles;
+	if(!pTiles || pTiles->empty())
+		return vec2(-1, -1);
+	return (*pTiles)[rand() % pTiles->size()];
+}
+
+bool CCollision::HasModTile(int TileIndex) const
+{
+	if(TileIndex == TILE_JAIL)
+		return !m_vJailTiles.empty();
+	if(TileIndex == TILE_JAIL_RELEASE)
+		return !m_vJailReleaseTiles.empty();
+	return false;
+}
+
+vec2 CCollision::RoundPos(vec2 Pos) const
+{
+	Pos = vec2((int)Pos.x, (int)Pos.y);
+	Pos.x -= (int)Pos.x % 32 - 16;
+	Pos.y -= (int)Pos.y % 32 - 16;
+	return Pos;
+}
+
+bool CCollision::IsFightBorder(vec2 Pos, int Fight) const
+{
+	if(!m_pDoor)
+		return false;
+	const int Index = GetPureMapIndex(Pos);
+	if(Index < 0)
+		return false;
+	return m_pDoor[Index].m_Number - 1 - HighestSwitcherId() == Fight;
 }
 #endif
 

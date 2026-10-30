@@ -102,6 +102,17 @@ public:
 	void UpdateTeamsState(int ClientId) { m_aMap[ClientId].m_UpdateTeamsState = true; }
 	void ForceInsertPlayer(int Insert, int ClientId) { m_aMap[ClientId].InsertNextEmptyOrReplace(Insert); }
 
+	// Durak snap-id helpers (F-DDrace). See-others id is used as the base reserved slot.
+	void AddToNumReserved(int ClientId, int Summand)
+	{
+		if(ClientId < 0 || ClientId >= MAX_CLIENTS)
+			return;
+		m_aMap[ClientId].m_NumReserved += Summand;
+		if(m_aMap[ClientId].m_NumReserved < 0)
+			m_aMap[ClientId].m_NumReserved = 0;
+	}
+	int GetFirstDurakID(int ClientId) { return SeeOthersId(ClientId) - 1; }
+
 	enum class ESeeOthersInd
 	{
 		NONE = -1,

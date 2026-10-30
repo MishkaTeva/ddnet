@@ -271,8 +271,11 @@ public:
 	std::optional<CSaveTee> m_LastDeath;
 
 #ifdef CONF_FDDRACE_MOD
+	bool m_CheckedSavePlayer = false;
+	bool m_LoadedSavedPlayer = false;
 	bool m_HasRoomKey = false;
 	int64_t m_JailTime = 0;
+	int64_t m_WalletMoney = 0;
 	bool m_JailArresting = false;
 	bool m_JailReleasing = false;
 	bool m_MuteGag = false;
@@ -281,8 +284,76 @@ public:
 	bool m_BanPlungerToilet = false;
 	int m_InfMeteors = 0;
 	int m_Permille = 0;
+	int64_t m_LastRedirectTryTick = 0;
+	int m_DrawTool = -1; // -1 off, 0=speedup, 1=button, 2=heli, 3=tele
 	class CPortal *m_apPortal[2] = {};
 	int GetAccID() const;
+	void StartPlotEdit();
+	void ClearPlot();
+	bool GivePortalBattery(int Amount);
+	bool GiveTaserBattery(int Amount);
+	int GetPortalBattery() const;
+	int64_t GetWalletMoney() const { return m_WalletMoney; }
+	void SetWalletMoney(int64_t Amount) { m_WalletMoney = Amount < 0 ? 0 : Amount; }
+	void WalletTransaction(int64_t Amount);
+	bool BankTransaction(int64_t Amount);
+	bool BankOrWalletTransaction(int64_t Amount, const char *pDescription = "")
+	{
+		(void)pDescription;
+		WalletTransaction(Amount);
+		return true;
+	}
+	int64_t GetUsableMoney() const;
+
+	// Minigames
+	enum
+	{
+		WEAPON_MINIGAME_CHANGE = -5,
+	};
+	int m_Minigame = -1; // MINIGAME_NONE
+	std::optional<int> m_Score;
+	int m_RequestedMinigame = -1;
+	int m_LastMinigameRequest = 0;
+	int m_LastMovementTick = 0;
+	bool m_SavedMinigameTee = false;
+	CSaveTee m_MinigameTee;
+	bool IsMinigame() const { return m_Minigame != -1; }
+	bool RequestMinigameChange(int RequestedMinigame);
+	void SaveMinigameTee();
+	bool LoadMinigameTee();
+	bool CanLoadMinigameTee() const;
+	void SetPlaying(bool DoChatMsg = false);
+	int m_HidePlayerTeam[MAX_CLIENTS];
+	int GetHidePlayerTeam(int Asker);
+	// Stub localize — returns English source string until server-side language is ported
+	const char *Localize(const char *pText, const char *pContext = "") const
+	{
+		(void)pContext;
+		return pText;
+	}
+
+	// Durak / display stubs (TODO: full F-DDrace name/clan remapping)
+	vec2 m_ForceSpawnPos = vec2(-1, -1);
+	bool m_ShowName = true;
+	bool m_RemovedName = false;
+	int m_ConfettiWinEffectTick = 0;
+	void SetName(const char *pName) { (void)pName; /* TODO */ }
+	void SetClan(const char *pClan) { (void)pClan; /* TODO */ }
+	void UpdateInformation(int ClientId = -1) { (void)ClientId; /* TODO */ }
+	void SetViewPos(vec2 Pos) { m_ViewPos = Pos; }
+
+	enum
+	{
+		VOTE_QUESTION_NONE = 0,
+		VOTE_QUESTION_FNG_SETTINGS = 1,
+	};
+	int m_VoteQuestionType = VOTE_QUESTION_NONE;
+	bool m_VoteQuestionRunning = false;
+	void StartVoteQuestion(int Type, int Seconds = 20) { (void)Seconds; m_VoteQuestionType = Type; m_VoteQuestionRunning = true; /* TODO */ }
+	void OnEndVoteQuestion(int Result = 0) { (void)Result; m_VoteQuestionRunning = false; m_VoteQuestionType = VOTE_QUESTION_NONE; }
+	int m_Gamemode = 0;
+	int m_SavedGamemode = 0;
+	void GiveXP(int Amount, const char *pReason = "") { (void)Amount; (void)pReason; /* TODO: XP system */ }
 #endif
 };
 

@@ -12,6 +12,7 @@
 #include <generated/protocol.h>
 
 #include <game/teamscore.h>
+#include <game/weapons_ex.h>
 
 #include <limits>
 #include <set>
@@ -210,7 +211,7 @@ public:
 		int m_Ammo;
 		int m_Ammocost;
 		bool m_Got;
-	} m_aWeapons[NUM_WEAPONS];
+	} m_aWeapons[NUM_FDDRACE_WEAPONS];
 
 	// ninja
 	struct
@@ -275,12 +276,29 @@ public:
 	int m_FreezeEnd;
 	bool m_IsInFreeze;
 	bool m_DeepFrozen;
+#ifdef CONF_FDDRACE_MOD
+	struct
+	{
+		int m_ClientID = -1;
+		int m_Weapon = -1;
+	} m_Killer;
+	static constexpr float PHYS_SIZE = 28.0f;
+#endif
 	bool m_LiveFrozen;
 	CTuningParams m_Tuning;
 
 #ifdef CONF_FDDRACE_MOD
 	// Defaults deny room/VIP+ until Phase 5 wires accounts / room keys.
 	MoveRestrictionExtra m_MoveRestrictionExtra;
+
+	void SetFlagInfo(int Team, vec2 Pos, int Stand, vec2 Vel, bool Carried);
+	vec2 m_FlagPos[2] = {};
+	vec2 m_FlagVel[2] = {};
+	bool m_AtStand[2] = {};
+	bool m_Carried[2] = {};
+	int m_UpdateFlagAtStand = 0;
+	int m_UpdateFlagVel = 0;
+	vec2 m_UFlagVel = {};
 #endif
 
 	// clientside only: antiping

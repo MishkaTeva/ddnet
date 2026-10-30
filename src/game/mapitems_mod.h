@@ -2,6 +2,9 @@
 // DDNet entity enum stays relative (+ ENTITY_OFFSET). Do not redefine DDNet
 // TILE_LFREEZE / TILE_LUNFREEZE (144–145) or armor entity slots (abs 226–228).
 
+#ifndef GAME_MAPITEMS_MOD_H
+#define GAME_MAPITEMS_MOD_H
+
 #ifndef CONF_FDDRACE_MOD
 // Mod build disabled — no extra map item constants.
 #else
@@ -34,6 +37,8 @@ enum
 	TILE_DURAK_TABLE = 180,
 	TILE_DURAK_SEAT = 181,
 	TILE_DURAK_LOBBY = 182,
+	TILE_1VS1_LOBBY = 132,
+	TILE_FLAG_STOP = 185,
 
 	// Switch layer — plot system (Phase 3 POC)
 	TILE_SWITCH_PLOT = 192,
@@ -41,6 +46,7 @@ enum
 	TILE_SWITCH_PLOT_TOTELE = 194,
 	TILE_SWITCH_REDIRECT_SERVER_FROM = 195,
 	TILE_SWITCH_REDIRECT_SERVER_TO = 196,
+	TILE_SWITCH_HELICOPTER_SPAWN = 219,
 
 	NUM_FDDRACE_INDICES = 256,
 	MAX_PLOTS = NUM_FDDRACE_INDICES - 1,
@@ -63,7 +69,9 @@ inline bool IsFddraceModGameTile(int Index)
 	       Index == TILE_NO_BONUS_AREA_LEAVE ||
 	       (Index >= TILE_VIP_PLUS_ONLY && Index <= TILE_ADMINS_ONLY) ||
 	       (Index >= TILE_MINIGAME_BLOCK && Index <= TILE_SURVIVAL_DEATHMATCH) ||
-	       (Index >= TILE_DURAK_TABLE && Index <= TILE_DURAK_LOBBY);
+	       (Index >= TILE_DURAK_TABLE && Index <= TILE_DURAK_LOBBY) ||
+	       Index == TILE_FLAG_STOP;
 }
 
-#endif
+#endif // CONF_FDDRACE_MOD
+#endif // GAME_MAPITEMS_MOD_H

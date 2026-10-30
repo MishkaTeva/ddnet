@@ -9,6 +9,7 @@
 #include <generated/protocol.h>
 
 #include <game/mapitems.h>
+#include <game/server/entities/character.h>
 #include <game/server/gamecontext.h>
 
 static float s_CurrentDist = 0.f;
@@ -49,7 +50,7 @@ void CTeleporter::Reset()
 
 void CTeleporter::ResetCollision(bool Remove)
 {
-	if(!m_Collision && !Remove)
+	if(!m_Collision)
 		return;
 
 	if(m_Type == TILE_TELEOUT)
@@ -102,6 +103,10 @@ void CTeleporter::Tick()
 void CTeleporter::Snap(int SnappingClient)
 {
 	if(NetworkClipped(SnappingClient))
+		return;
+
+	CCharacter *pChr = GameServer()->GetPlayerChar(SnappingClient);
+	if(pChr && pChr->m_DrawEditor.OnSnapPreview(this))
 		return;
 
 	if(g_Config.m_SvLightTeleporters)

@@ -103,6 +103,7 @@ void CJailRelease::DoReleaseCleanup()
 
 	pPlayer->m_JailReleasing = false;
 	pPlayer->m_JailTime = 1;
+	GameServer()->m_FddraceSave.RemoveJailSave(m_Victim);
 }
 
 void CJailRelease::Finish()

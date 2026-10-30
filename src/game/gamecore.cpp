@@ -64,6 +64,20 @@ float CTuningParams::GetWeaponFireDelay(int Weapon) const
 	case WEAPON_GRENADE: return (float)m_GrenadeFireDelay / 1000.0f;
 	case WEAPON_LASER: return (float)m_LaserFireDelay / 1000.0f;
 	case WEAPON_NINJA: return (float)m_NinjaFireDelay / 1000.0f;
+#ifdef CONF_FDDRACE_MOD
+	case WEAPON_TASER: return (float)m_TaserFireDelay / 1000.0f;
+	case WEAPON_PORTAL_RIFLE: return (float)m_PortalRifleFireDelay / 1000.0f;
+	case WEAPON_PLASMA_RIFLE: return (float)m_PlasmaRifleFireDelay / 1000.0f;
+	case WEAPON_PROJECTILE_RIFLE: return (float)m_ProjectileRifleFireDelay / 1000.0f;
+	case WEAPON_TELE_RIFLE: return (float)m_TeleRifleFireDelay / 1000.0f;
+	case WEAPON_LIGHTNING_LASER: return (float)m_LightningLaserFireDelay / 1000.0f;
+	case WEAPON_STRAIGHT_GRENADE: return (float)m_StraightGrenadeFireDelay / 1000.0f;
+	case WEAPON_BALL_GRENADE: return (float)m_BallGrenadeFireDelay / 1000.0f;
+	case WEAPON_HEART_GUN: return (float)m_HeartGunFireDelay / 1000.0f;
+	case WEAPON_LIGHTSABER: return (float)m_LightsaberFireDelay / 1000.0f;
+	case WEAPON_TELEKINESIS: return (float)m_TelekinesisFireDelay / 1000.0f;
+	case WEAPON_DRAW_EDITOR: return (float)m_EditorFireDelay / 1000.0f;
+#endif
 	default: dbg_assert_failed("invalid weapon");
 	}
 }
@@ -200,6 +214,8 @@ void CCharacterCore::Reset()
 void CCharacterCore::Tick(bool UseInput, bool DoDeferredTick)
 {
 #ifdef CONF_FDDRACE_MOD
+	m_UpdateFlagVel = 0;
+	m_UpdateFlagAtStand = 0;
 	m_MoveRestrictions = m_pCollision->GetMoveRestrictions(UseInput ? IsSwitchActiveCb : nullptr, this, m_Pos, 18.0f, -1, m_MoveRestrictionExtra);
 #else
 	m_MoveRestrictions = m_pCollision->GetMoveRestrictions(UseInput ? IsSwitchActiveCb : nullptr, this, m_Pos);
@@ -385,6 +401,30 @@ void CCharacterCore::Tick(bool UseInput, bool DoDeferredTick)
 			}
 		}
 
+#ifdef CONF_FDDRACE_MOD
+		if(g_Config.m_SvFlagHooking && (m_HookState == HOOK_FLYING || !m_NewHook) &&
+			(g_Config.m_SvFlagHooking != 2 || (m_Id != -1 && m_pTeams && !m_pTeams->GetSolo(m_Id))))
+		{
+			for(int i = 0; i < 2; i++)
+			{
+				vec2 ClosestPoint;
+				if(closest_point_on_line(m_HookPos, NewPos, m_FlagPos[i], ClosestPoint))
+				{
+					const bool HitBody = distance(m_FlagPos[i], ClosestPoint) < PhysicalSize() + 2.0f;
+					const bool HitTop = distance(vec2(m_FlagPos[i].x, m_FlagPos[i].y - 32.f), ClosestPoint) < PhysicalSize() + 2.0f;
+					if((HitBody || HitTop) && !m_Carried[i] && m_HookedPlayer == -1)
+					{
+						m_TriggeredEvents |= COREEVENT_HOOK_ATTACH_GROUND;
+						m_HookState = HOOK_GRABBED;
+						SetHookedPlayer(i == TEAM_RED ? HOOK_FLAG_RED : HOOK_FLAG_BLUE);
+						if(m_AtStand[i])
+							m_UpdateFlagAtStand = m_HookedPlayer;
+					}
+				}
+			}
+		}
+#endif
+
 		if(m_HookState == HOOK_FLYING)
 		{
 			// check against ground
@@ -421,6 +461,23 @@ void CCharacterCore::Tick(bool UseInput, bool DoDeferredTick)
 	{
 #ifdef CONF_FDDRACE_MOD
 		const bool HookedFlag = m_HookedPlayer == HOOK_FLAG_RED || m_HookedPlayer == HOOK_FLAG_BLUE;
+		if(HookedFlag)
+		{
+			for(int i = 0; i < 2; i++)
+			{
+				if((i == TEAM_RED && m_HookedPlayer == HOOK_FLAG_RED) || (i == TEAM_BLUE && m_HookedPlayer == HOOK_FLAG_BLUE))
+				{
+					if(!m_Carried[i])
+						m_HookPos = m_FlagPos[i];
+					else
+					{
+						SetHookedPlayer(-1);
+						m_HookState = HOOK_RETRACTED;
+						m_HookPos = m_Pos;
+					}
+				}
+			}
+		}
 #else
 		const bool HookedFlag = false;
 #endif
@@ -537,6 +594,30 @@ void CCharacterCore::TickDeferred()
 				}
 			}
 		}
+
+#ifdef CONF_FDDRACE_MOD
+		if(m_HookedPlayer == HOOK_FLAG_RED || m_HookedPlayer == HOOK_FLAG_BLUE)
+		{
+			const int Team = m_HookedPlayer == HOOK_FLAG_RED ? TEAM_RED : TEAM_BLUE;
+			const float Distance = distance(m_Pos, m_FlagPos[Team]);
+			if(Distance > PhysicalSize() * 1.50f)
+			{
+				const vec2 Dir = normalize(m_Pos - m_FlagPos[Team]);
+				const float Accel = m_Tuning.m_HookDragAccel * (Distance / m_Tuning.m_HookLength);
+				const float DragSpeed = m_Tuning.m_HookDragSpeed;
+
+				vec2 Temp;
+				Temp.x = SaturatedAdd(-DragSpeed, DragSpeed, m_FlagVel[Team].x, Accel * Dir.x * 1.5f);
+				Temp.y = SaturatedAdd(-DragSpeed, DragSpeed, m_FlagVel[Team].y, Accel * Dir.y * 1.5f);
+				m_UFlagVel = Temp;
+				m_UpdateFlagVel = m_HookedPlayer;
+
+				Temp.x = SaturatedAdd(-DragSpeed, DragSpeed, m_Vel.x, -Accel * Dir.x * 0.25f);
+				Temp.y = SaturatedAdd(-DragSpeed, DragSpeed, m_Vel.y, -Accel * Dir.y * 0.25f);
+				m_Vel = ClampVel(m_MoveRestrictions, Temp);
+			}
+		}
+#endif
 
 		if(m_HookState != HOOK_FLYING)
 		{
@@ -743,7 +824,11 @@ void CCharacterCore::SetHookedPlayer(int HookedPlayer)
 #endif
 	if(HookedPlayer != m_HookedPlayer)
 	{
-		if(m_HookedPlayer != -1 && m_Id != -1 && m_pWorld)
+		if(m_HookedPlayer != -1 && m_Id != -1 && m_pWorld
+#ifdef CONF_FDDRACE_MOD
+			&& m_HookedPlayer != HOOK_FLAG_RED && m_HookedPlayer != HOOK_FLAG_BLUE
+#endif
+		)
 		{
 			CCharacterCore *pCharCore = m_pWorld->m_apCharacters[m_HookedPlayer];
 			if(pCharCore)
@@ -762,6 +847,18 @@ void CCharacterCore::SetHookedPlayer(int HookedPlayer)
 		m_HookedPlayer = HookedPlayer;
 	}
 }
+
+#ifdef CONF_FDDRACE_MOD
+void CCharacterCore::SetFlagInfo(int Team, vec2 Pos, int Stand, vec2 Vel, bool Carried)
+{
+	if(Team < 0 || Team > 1)
+		return;
+	m_FlagPos[Team] = Pos;
+	m_AtStand[Team] = Stand;
+	m_FlagVel[Team] = Vel;
+	m_Carried[Team] = Carried;
+}
+#endif
 
 // DDRace
 

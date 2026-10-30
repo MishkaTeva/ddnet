@@ -11,6 +11,8 @@
 #include <base/log.h>
 #include <base/time.h>
 
+#include <algorithm>
+
 #include <engine/antibot.h>
 #include <engine/shared/config.h>
 
@@ -24,6 +26,24 @@
 #include <game/server/score.h>
 #include <game/server/teams.h>
 #include <game/team_state.h>
+
+#ifdef CONF_FDDRACE_MOD
+#include <mod/game/server/account.h>
+#include <mod/game/server/entities/button.h>
+#include <mod/game/server/entities/flag.h>
+#include <mod/game/server/entities/grog.h>
+#include <mod/game/server/entities/helicopter.h>
+#include <mod/game/server/entities/pickup_drop.h>
+#include <mod/game/server/entities/portal.h>
+#include <mod/game/server/entities/speedup.h>
+#include <mod/game/server/entities/teleporter.h>
+#include <mod/game/server/minigames/arenas.h>
+#include <mod/game/server/minigames/fng.h>
+#include <mod/game/server/minigames/minigame.h>
+#include <mod/game/server/minigames/survival.h>
+#include <game/mapitems.h>
+#include <game/weapons_ex.h>
+#endif
 
 MACRO_ALLOC_POOL_ID_IMPL(CCharacter, MAX_CLIENTS)
 
@@ -112,6 +132,9 @@ bool CCharacter::Spawn(CPlayer *pPlayer, vec2 Pos)
 
 #ifdef CONF_FDDRACE_MOD
 	GameServer()->Accounts()->SyncMoveRestrictions(m_pPlayer);
+	GameServer()->Accounts()->ApplyAccountLoadouts(m_pPlayer);
+	m_DrawEditor.Init(this);
+	m_pPlayer->LoadMinigameTee();
 #endif
 
 	m_TuneZone = TuneZone;
@@ -122,6 +145,11 @@ bool CCharacter::Spawn(CPlayer *pPlayer, vec2 Pos)
 
 	TrySetRescue(RESCUEMODE_MANUAL);
 	Server()->StartRecord(m_pPlayer->GetCid());
+
+#ifdef CONF_FDDRACE_MOD
+	if(m_pPlayer->m_Minigame == MINIGAME_INSTAGIB_FNG || m_pPlayer->m_Minigame == MINIGAME_INSTAGIB_BOOMFNG)
+		((CFng *)GameServer()->m_pMinigames[m_pPlayer->m_Minigame])->OnCharacterSpawn(m_pPlayer->GetCid());
+#endif
 
 	int Team = GameServer()->m_aTeamMapping[m_pPlayer->GetCid()];
 
@@ -165,8 +193,12 @@ void CCharacter::SetWeapon(int W)
 	m_Core.m_ActiveWeapon = W;
 	GameServer()->CreateSound(m_Pos, SOUND_WEAPON_SWITCH, TeamMask());
 
-	if(m_Core.m_ActiveWeapon < 0 || m_Core.m_ActiveWeapon >= NUM_WEAPONS)
+	if(m_Core.m_ActiveWeapon < 0 || m_Core.m_ActiveWeapon >= NUM_FDDRACE_WEAPONS)
 		m_Core.m_ActiveWeapon = 0;
+
+#ifdef CONF_FDDRACE_MOD
+	m_DrawEditor.OnWeaponSwitch();
+#endif
 }
 
 void CCharacter::SetJetpack(bool Active)
@@ -416,7 +448,7 @@ void CCharacter::HandleWeaponSwitch()
 		WantedWeapon = m_QueuedWeapon;
 
 	bool Anything = false;
-	for(int i = 0; i < NUM_WEAPONS - 1; ++i)
+	for(int i = 0; i < NUM_FDDRACE_WEAPONS - 1; ++i)
 		if(m_Core.m_aWeapons[i].m_Got)
 			Anything = true;
 	if(!Anything)
@@ -429,7 +461,7 @@ void CCharacter::HandleWeaponSwitch()
 	{
 		while(Next) // Next Weapon selection
 		{
-			WantedWeapon = (WantedWeapon + 1) % NUM_WEAPONS;
+			WantedWeapon = (WantedWeapon + 1) % NUM_FDDRACE_WEAPONS;
 			if(m_Core.m_aWeapons[WantedWeapon].m_Got)
 				Next--;
 		}
@@ -439,7 +471,7 @@ void CCharacter::HandleWeaponSwitch()
 	{
 		while(Prev) // Prev Weapon selection
 		{
-			WantedWeapon = (WantedWeapon - 1) < 0 ? NUM_WEAPONS - 1 : WantedWeapon - 1;
+			WantedWeapon = (WantedWeapon - 1) < 0 ? NUM_FDDRACE_WEAPONS - 1 : WantedWeapon - 1;
 			if(m_Core.m_aWeapons[WantedWeapon].m_Got)
 				Prev--;
 		}
@@ -450,7 +482,7 @@ void CCharacter::HandleWeaponSwitch()
 		WantedWeapon = m_Input.m_WantedWeapon - 1;
 
 	// check for insane values
-	if(WantedWeapon >= 0 && WantedWeapon < NUM_WEAPONS && WantedWeapon != m_Core.m_ActiveWeapon && m_Core.m_aWeapons[WantedWeapon].m_Got)
+	if(WantedWeapon >= 0 && WantedWeapon < NUM_FDDRACE_WEAPONS && WantedWeapon != m_Core.m_ActiveWeapon && m_Core.m_aWeapons[WantedWeapon].m_Got)
 		m_QueuedWeapon = WantedWeapon;
 
 	DoWeaponSwitch();
@@ -487,14 +519,56 @@ void CCharacter::FireWeapon()
 
 	// check if we gonna fire
 	bool WillFire = false;
+	bool ClickedFire = false;
 	if(CountInput(m_LatestPrevInput.m_Fire, m_LatestInput.m_Fire).m_Presses)
+	{
 		WillFire = true;
+		ClickedFire = true;
+	}
+
+#ifdef CONF_FDDRACE_MOD
+	for(int i = 0; i < NUM_HOUSES; i++)
+	{
+		if(!GameServer()->m_pHouses[i] || !GameServer()->m_pHouses[i]->CanChangePage(m_pPlayer->GetCid()))
+			continue;
+		if(ClickedFire)
+			GameServer()->m_pHouses[i]->DoPageChange(m_pPlayer->GetCid(), GetAimDir());
+		return;
+	}
+#endif
 
 	if(FullAuto && (m_LatestInput.m_Fire & 1) && m_Core.m_ActiveWeapon >= 0 && m_Core.m_aWeapons[m_Core.m_ActiveWeapon].m_Ammo)
 		WillFire = true;
 
 	if(!WillFire)
 		return;
+
+#ifdef CONF_FDDRACE_MOD
+	if(m_DrawEditor.Active())
+	{
+		m_DrawEditor.OnPlayerFire();
+		m_AttackTick = Server()->Tick();
+		m_ReloadTimer = Server()->TickSpeed() / 3;
+		return;
+	}
+	if(m_pPlayer->m_DrawTool >= 0)
+	{
+		vec2 PlacePos = m_Pos + Direction * 64.f;
+		PlacePos.x = (float)(round_to_int(PlacePos.x) / 32 * 32 + 16);
+		PlacePos.y = (float)(round_to_int(PlacePos.y) / 32 * 32 + 16);
+		if(m_pPlayer->m_DrawTool == 0)
+			new CSpeedup(GameWorld(), PlacePos, 0.f, 10, 0);
+		else if(m_pPlayer->m_DrawTool == 1)
+			new CButton(GameWorld(), PlacePos, 1);
+		else if(m_pPlayer->m_DrawTool == 2)
+			new CHelicopter(GameWorld(), PlacePos, -1);
+		else if(m_pPlayer->m_DrawTool == 3)
+			new CTeleporter(GameWorld(), PlacePos, TILE_TELEOUT, 1);
+		m_AttackTick = Server()->Tick();
+		m_ReloadTimer = Server()->TickSpeed() / 3;
+		return;
+	}
+#endif
 
 	if(m_FreezeTime)
 	{
@@ -548,14 +622,30 @@ void CCharacter::FireWeapon()
 			else
 				Dir = vec2(0.f, -1.f);
 
-			float Strength = GetTuning(m_TuneZone)->m_HammerStrength;
+#ifdef CONF_FDDRACE_MOD
+			const int TargetMinigame = pTarget->GetPlayer()->m_Minigame;
+			const bool IsInstagib = TargetMinigame == MINIGAME_INSTAGIB_FNG || TargetMinigame == MINIGAME_INSTAGIB_BOOMFNG;
+			if(IsInstagib)
+			{
+				vec2 FngForce = vec2(0.f, -1.f);
+				if(((CFng *)GameServer()->m_pMinigames[TargetMinigame])->OnHammerHit(m_pPlayer->GetCid(), pTarget->GetPlayer()->GetCid(), FngForce))
+				{
+					vec2 Temp = pTarget->m_Core.m_Vel + FngForce;
+					pTarget->m_Core.m_Vel = ClampVel(pTarget->m_MoveRestrictions, Temp);
+				}
+			}
+			else
+#endif
+			{
+				float Strength = GetTuning(m_TuneZone)->m_HammerStrength;
 
-			vec2 Temp = pTarget->m_Core.m_Vel + normalize(Dir + vec2(0.f, -1.1f)) * 10.0f;
-			Temp = ClampVel(pTarget->m_MoveRestrictions, Temp);
-			Temp -= pTarget->m_Core.m_Vel;
-			pTarget->TakeDamage((vec2(0.f, -1.0f) + Temp) * Strength, g_pData->m_Weapons.m_Hammer.m_pBase->m_Damage,
-				m_pPlayer->GetCid(), m_Core.m_ActiveWeapon);
-			pTarget->Unfreeze();
+				vec2 Temp = pTarget->m_Core.m_Vel + normalize(Dir + vec2(0.f, -1.1f)) * 10.0f;
+				Temp = ClampVel(pTarget->m_MoveRestrictions, Temp);
+				Temp -= pTarget->m_Core.m_Vel;
+				pTarget->TakeDamage((vec2(0.f, -1.0f) + Temp) * Strength, g_pData->m_Weapons.m_Hammer.m_pBase->m_Damage,
+					m_pPlayer->GetCid(), m_Core.m_ActiveWeapon);
+				pTarget->Unfreeze();
+			}
 
 			Antibot()->OnHammerHit(m_pPlayer->GetCid(), pTarget->GetPlayer()->GetCid());
 
@@ -648,6 +738,112 @@ void CCharacter::FireWeapon()
 		GameServer()->CreateSound(m_Pos, SOUND_NINJA_FIRE, TeamMask()); // NOLINT(clang-analyzer-unix.Malloc)
 	}
 	break;
+
+#ifdef CONF_FDDRACE_MOD
+	case WEAPON_TASER:
+	{
+		const int AccId = GameServer()->Accounts()->FindByClientId(m_pPlayer->GetCid());
+		SAccountInfo *pAcc = GameServer()->Accounts()->Get(AccId);
+		if(pAcc && AccId >= ACC_START && pAcc->m_TaserBattery <= 0)
+		{
+			GameServer()->CreateSound(m_Pos, SOUND_WEAPON_NOAMMO, TeamMask());
+			return;
+		}
+		const int TaserStrength = GetTaserStrength();
+		m_LastTaserUse = Server()->Tick();
+		if(pAcc && AccId >= ACC_START && pAcc->m_TaserBattery > 0)
+		{
+			pAcc->m_TaserBattery--;
+			GameServer()->Accounts()->Persist(AccId);
+		}
+		float LaserReach = GetTuning(m_TuneZone)->m_LaserReach;
+		new CLaser(GameWorld(), m_Pos, Direction, LaserReach, m_pPlayer->GetCid(), WEAPON_TASER, TaserStrength);
+		GameServer()->CreateSound(m_Pos, SOUND_LASER_FIRE, TeamMask());
+	}
+	break;
+
+	case WEAPON_PORTAL_RIFLE:
+	{
+		vec2 PortalPos = m_Pos + Direction * 64.f;
+		if(m_LatestInput.m_TargetX || m_LatestInput.m_TargetY)
+		{
+			PortalPos = m_Pos + vec2((float)m_LatestInput.m_TargetX, (float)m_LatestInput.m_TargetY);
+			const float MaxDist = (float)g_Config.m_SvPortalMaxDistance;
+			if(distance(PortalPos, m_Pos) > MaxDist)
+				PortalPos = m_Pos + normalize(PortalPos - m_Pos) * MaxDist;
+		}
+		if(GameServer()->Collision()->TestBox(PortalPos, vec2(28.f, 28.f)))
+		{
+			GameServer()->CreateSound(m_Pos, SOUND_WEAPON_NOAMMO, TeamMask());
+			return;
+		}
+		if(distance(PortalPos, m_Pos) > g_Config.m_SvPortalMaxDistance ||
+			GameServer()->Collision()->IntersectLine(m_Pos, PortalPos, nullptr, nullptr))
+		{
+			GameServer()->CreateSound(m_Pos, SOUND_WEAPON_NOAMMO, TeamMask());
+			return;
+		}
+		CPortal *&pFirst = m_pPlayer->m_apPortal[PORTAL_FIRST];
+		CPortal *&pSecond = m_pPlayer->m_apPortal[PORTAL_SECOND];
+		if(pFirst && pSecond)
+		{
+			delete pFirst;
+			delete pSecond;
+			pFirst = pSecond = nullptr;
+		}
+		if(!pFirst)
+		{
+			pFirst = new CPortal(GameWorld(), PortalPos, m_pPlayer->GetCid());
+		}
+		else
+		{
+			pSecond = new CPortal(GameWorld(), PortalPos, m_pPlayer->GetCid());
+			pFirst->SetLinkedPortal(pSecond);
+			pSecond->SetLinkedPortal(pFirst);
+			if(g_Config.m_SvPortalRifleAmmo)
+				m_pPlayer->GivePortalBattery(-1);
+		}
+		GameServer()->CreateSound(m_Pos, SOUND_LASER_FIRE, TeamMask());
+	}
+	break;
+
+	case WEAPON_PLASMA_RIFLE:
+	case WEAPON_PROJECTILE_RIFLE:
+	case WEAPON_TELE_RIFLE:
+	case WEAPON_LIGHTNING_LASER:
+	case WEAPON_HEART_GUN:
+	case WEAPON_TELEKINESIS:
+	case WEAPON_LIGHTSABER:
+	{
+		// Slim stand-ins until full weapon entities are ported: behave like laser.
+		float LaserReach = GetTuning(m_TuneZone)->m_LaserReach;
+		new CLaser(GameWorld(), m_Pos, Direction, LaserReach, m_pPlayer->GetCid(), WEAPON_LASER);
+		GameServer()->CreateSound(m_Pos, SOUND_LASER_FIRE, TeamMask());
+	}
+	break;
+
+	case WEAPON_STRAIGHT_GRENADE:
+	case WEAPON_BALL_GRENADE:
+	{
+		int Lifetime = (int)(Server()->TickSpeed() * GetTuning(m_TuneZone)->m_GrenadeLifetime);
+		new CProjectile(
+			GameWorld(),
+			WEAPON_GRENADE,
+			m_pPlayer->GetCid(),
+			ProjStartPos,
+			Direction,
+			Lifetime,
+			false,
+			true,
+			SOUND_GRENADE_EXPLODE,
+			MouseTarget);
+		GameServer()->CreateSound(m_Pos, SOUND_GRENADE_FIRE, TeamMask());
+	}
+	break;
+
+	case WEAPON_DRAW_EDITOR:
+		break;
+#endif
 	}
 
 	m_AttackTick = Server()->Tick();
@@ -757,6 +953,10 @@ void CCharacter::OnDirectInput(const CNetObj_PlayerInput *pNewInput)
 
 	Antibot()->OnDirectInput(m_pPlayer->GetCid());
 
+#ifdef CONF_FDDRACE_MOD
+	m_DrawEditor.OnInput(&m_LatestInput);
+#endif
+
 	if(m_NumInputs > 1 && m_pPlayer->GetTeam() != TEAM_SPECTATORS)
 	{
 		HandleWeaponSwitch();
@@ -815,8 +1015,30 @@ void CCharacter::PreTick()
 
 	Antibot()->OnCharacterTick(m_pPlayer->GetCid());
 
+#ifdef CONF_FDDRACE_MOD
+	for(int i = 0; i < 2; i++)
+	{
+		if(CFlag *pFlag = GameServer()->GetFlag(i))
+			m_Core.SetFlagInfo(i, pFlag->GetPos(), pFlag->IsAtStand(), pFlag->GetVel(), pFlag->GetCarrier() != nullptr);
+	}
+#endif
+
 	m_Core.m_Input = m_Input;
 	m_Core.Tick(true, !g_Config.m_SvNoWeakHook);
+#ifdef CONF_FDDRACE_MOD
+	if(m_Core.m_UpdateFlagVel == HOOK_FLAG_RED || m_Core.m_UpdateFlagVel == HOOK_FLAG_BLUE)
+	{
+		const int Flag = m_Core.m_UpdateFlagVel == HOOK_FLAG_RED ? TEAM_RED : TEAM_BLUE;
+		if(CFlag *pFlag = GameServer()->GetFlag(Flag))
+			pFlag->SetVel(m_Core.m_UFlagVel);
+	}
+	if(m_Core.m_UpdateFlagAtStand == HOOK_FLAG_RED || m_Core.m_UpdateFlagAtStand == HOOK_FLAG_BLUE)
+	{
+		const int Flag = m_Core.m_UpdateFlagAtStand == HOOK_FLAG_RED ? TEAM_RED : TEAM_BLUE;
+		if(CFlag *pFlag = GameServer()->GetFlag(Flag))
+			pFlag->SetAtStand(false);
+	}
+#endif
 }
 
 void CCharacter::Tick()
@@ -841,12 +1063,17 @@ void CCharacter::Tick()
 	// handle Weapons
 	HandleWeapons();
 
+#ifdef CONF_FDDRACE_MOD
+	m_DrawEditor.Tick();
+#endif
+
 	DDRacePostCoreTick();
 
 	if(m_Core.m_TriggeredEvents & COREEVENT_HOOK_ATTACH_PLAYER)
 	{
 		const int HookedPlayer = m_Core.HookedPlayer();
-		if(HookedPlayer != -1 && GameServer()->m_apPlayers[HookedPlayer]->GetTeam() != TEAM_SPECTATORS)
+		if(HookedPlayer >= 0 && HookedPlayer < MAX_CLIENTS && GameServer()->m_apPlayers[HookedPlayer] &&
+			GameServer()->m_apPlayers[HookedPlayer]->GetTeam() != TEAM_SPECTATORS)
 		{
 			Antibot()->OnHookAttach(m_pPlayer->GetCid(), true);
 		}
@@ -1021,6 +1248,30 @@ void CCharacter::StopRecording()
 
 void CCharacter::Die(int Killer, int Weapon, bool SendKillMsg)
 {
+#ifdef CONF_FDDRACE_MOD
+	{
+		const int FlagTeam = GameServer()->HasFlag(this);
+		if(FlagTeam >= 0)
+		{
+			if(CFlag *pFlag = GameServer()->GetFlag(FlagTeam))
+				pFlag->Drop(GetAimDir());
+		}
+	}
+	m_Rainbow = false;
+	m_Bloody = false;
+	m_DrawEditor.OnPlayerDeath();
+
+	if(GameServer()->Arenas())
+		GameServer()->Arenas()->OnCharacterDie(this, Killer);
+	if(GameServer()->Survival())
+		GameServer()->Survival()->OnCharacterDie(this, Killer);
+
+	if((m_pPlayer->m_Minigame == MINIGAME_INSTAGIB_FNG || m_pPlayer->m_Minigame == MINIGAME_INSTAGIB_BOOMFNG) && Weapon != CPlayer::WEAPON_MINIGAME_CHANGE)
+	{
+		int KillerId = (Killer >= 0 && Killer < MAX_CLIENTS && GameServer()->m_apPlayers[Killer]) ? Killer : -1;
+		((CFng *)GameServer()->m_pMinigames[m_pPlayer->m_Minigame])->OnPlayerDie(m_pPlayer->GetCid(), KillerId, Weapon);
+	}
+#endif
 	if(Killer != WEAPON_GAME && m_SetSavePos[RESCUEMODE_AUTO])
 		GetPlayer()->m_LastDeath = m_RescueTee[RESCUEMODE_AUTO];
 	StopRecording();
@@ -1054,6 +1305,23 @@ void CCharacter::Die(int Killer, int Weapon, bool SendKillMsg)
 
 bool CCharacter::TakeDamage(vec2 Force, int Dmg, int From, int Weapon)
 {
+#ifdef CONF_FDDRACE_MOD
+	const int PlayerMinigame = m_pPlayer->m_Minigame;
+	if((PlayerMinigame == MINIGAME_INSTAGIB_FNG || PlayerMinigame == MINIGAME_INSTAGIB_BOOMFNG) && From != m_pPlayer->GetCid() && From >= 0 && GameServer()->m_apPlayers[From])
+	{
+		if(Weapon == WEAPON_HAMMER)
+			return false;
+
+		if(((CFng *)GameServer()->m_pMinigames[PlayerMinigame])->OnWeaponHit(m_pPlayer->GetCid(), From, Weapon))
+		{
+			vec2 Temp = m_Core.m_Vel + Force;
+			m_Core.m_Vel = ClampVel(m_MoveRestrictions, Temp);
+			return true;
+		}
+		return false;
+	}
+#endif
+
 	if(Dmg)
 	{
 		SetEmote(EMOTE_PAIN, Server()->Tick() + 500 * Server()->TickSpeed() / 1000);
@@ -1143,6 +1411,12 @@ void CCharacter::SnapCharacter(int SnappingClient, int MapId)
 		Weapon = WEAPON_NINJA;
 		AmmoCount = 10;
 	}
+
+#ifdef CONF_FDDRACE_MOD
+	// Clients only know vanilla weapons — show rifle for custom guns.
+	if(Weapon >= NUM_VANILLA_WEAPONS)
+		Weapon = WEAPON_LASER;
+#endif
 
 	if(m_pPlayer->GetCid() == SnappingClient || SnappingClient == SERVER_DEMO_CLIENT ||
 		(!g_Config.m_SvStrictSpectateMode && m_pPlayer->GetCid() == GameServer()->m_apPlayers[SnappingClient]->SpectatorId()))
@@ -1270,6 +1544,11 @@ void CCharacter::Snap(int SnappingClient)
 	if(!IsSnappingCharacterInView(SnappingClient) && m_pPlayer->GetCid() != SnappingClient)
 		return;
 
+#ifdef CONF_FDDRACE_MOD
+	if(SnappingClient == m_pPlayer->GetCid())
+		m_DrawEditor.Snap();
+#endif
+
 	int SnappingClientVersion = GameServer()->GetClientVersion(SnappingClient);
 
 	// Translate id, if we are not in the map of the other person display us as weapon and our hook as a laser.
@@ -1357,6 +1636,15 @@ void CCharacter::Snap(int SnappingClient)
 	DDNetCharacter.m_JumpedTotal = m_Core.m_JumpedTotal;
 	DDNetCharacter.m_NinjaActivationTick = m_Core.m_Ninja.m_ActivationTick;
 	DDNetCharacter.m_FreezeStart = m_Core.m_FreezeStart;
+#ifdef CONF_FDDRACE_MOD
+	if(m_pPlayer->m_Minigame == MINIGAME_INSTAGIB_FNG || m_pPlayer->m_Minigame == MINIGAME_INSTAGIB_BOOMFNG)
+	{
+		// Keep FreezeEnd for client prediction, but collapse the bar range so
+		// DDNet's freeze bar has no visible countdown in FNG.
+		if(DDNetCharacter.m_FreezeEnd > 0)
+			DDNetCharacter.m_FreezeStart = DDNetCharacter.m_FreezeEnd;
+	}
+#endif
 	if(m_Core.m_IsInFreeze)
 	{
 		DDNetCharacter.m_Flags |= CHARACTERFLAG_IN_FREEZE;
@@ -1688,10 +1976,33 @@ void CCharacter::HandleTiles(int Index)
 		Die(m_pPlayer->GetCid(), WEAPON_WORLD);
 		return;
 	}
+
+	for(int i = 0; i < NUM_HOUSES; i++)
+	{
+		int HouseIndex = -1;
+		switch(i)
+		{
+		case HOUSE_SHOP: HouseIndex = TILE_SHOP; break;
+		case HOUSE_PLOT_SHOP: HouseIndex = TILE_PLOT_SHOP; break;
+		case HOUSE_BANK: HouseIndex = TILE_BANK; break;
+		case HOUSE_TAVERN: HouseIndex = TILE_TAVERN; break;
+		}
+		if(!GameServer()->m_pHouses[i] || HouseIndex < 0)
+			continue;
+		if(m_TileIndex == HouseIndex || m_TileFIndex == HouseIndex)
+		{
+			if(m_LastIndexTile != HouseIndex && m_LastIndexFrontTile != HouseIndex)
+				GameServer()->m_pHouses[i]->OnEnter(m_pPlayer->GetCid());
+		}
+	}
 #endif
 
-	// freeze
-	if(((m_TileIndex == TILE_FREEZE) || (m_TileFIndex == TILE_FREEZE)) && !m_Core.m_Super && !m_Core.m_Invincible && !m_Core.m_DeepFrozen)
+	// freeze (tile 9 is FNG spike, so skip default freeze logic while in FNG/BoomFNG)
+	if(((m_TileIndex == TILE_FREEZE) || (m_TileFIndex == TILE_FREEZE)) && !m_Core.m_Super && !m_Core.m_Invincible && !m_Core.m_DeepFrozen
+#ifdef CONF_FDDRACE_MOD
+		&& m_pPlayer->m_Minigame != MINIGAME_INSTAGIB_FNG && m_pPlayer->m_Minigame != MINIGAME_INSTAGIB_BOOMFNG
+#endif
+	)
 	{
 		Freeze();
 	}
@@ -1924,6 +2235,27 @@ void CCharacter::HandleTiles(int Index)
 			m_Core.m_LiveFrozen = false;
 		}
 	}
+#ifdef CONF_FDDRACE_MOD
+	else if(SwitchType == TILE_SWITCH_REDIRECT_SERVER_FROM && Team() != TEAM_SUPER && SwitchNumber > 0)
+	{
+		const int Port = GameServer()->GetRedirectListPort(SwitchNumber);
+		if(Port > 0)
+		{
+			if(Port == g_Config.m_SvPort)
+			{
+				LoadRedirectTile(Port);
+			}
+			else if(!TrySafelyRedirectClient(Port))
+			{
+				LoadRedirectTile(Port);
+			}
+			else
+			{
+				return;
+			}
+		}
+	}
+#endif
 	else if(SwitchType == TILE_HIT_ENABLE && m_Core.m_HammerHitDisabled && SwitchDelay == WEAPON_HAMMER)
 	{
 		GameServer()->SendChatTarget(GetPlayer()->GetCid(), "You can hammer hit others");
@@ -2154,6 +2486,23 @@ void CCharacter::HandleTiles(int Index)
 		}
 		return;
 	}
+#ifdef CONF_FDDRACE_MOD
+	for(int i = 0; i < NUM_HOUSES; i++)
+	{
+		int HouseIndex = -1;
+		switch(i)
+		{
+		case HOUSE_SHOP: HouseIndex = TILE_SHOP; break;
+		case HOUSE_PLOT_SHOP: HouseIndex = TILE_PLOT_SHOP; break;
+		case HOUSE_BANK: HouseIndex = TILE_BANK; break;
+		case HOUSE_TAVERN: HouseIndex = TILE_TAVERN; break;
+		}
+		if(GameServer()->m_pHouses[i] && HouseIndex >= 0 && m_TileIndex != HouseIndex && m_TileFIndex != HouseIndex)
+			GameServer()->m_pHouses[i]->OnLeave(m_pPlayer->GetCid());
+	}
+	m_LastIndexTile = m_TileIndex;
+	m_LastIndexFrontTile = m_TileFIndex;
+#endif
 }
 
 void CCharacter::HandleTuneLayer()
@@ -2161,7 +2510,11 @@ void CCharacter::HandleTuneLayer()
 	m_TuneZoneOld = m_TuneZone;
 	int CurrentIndex = Collision()->GetMapIndex(m_Pos);
 	m_TuneZone = Collision()->IsTune(CurrentIndex);
+#ifdef CONF_FDDRACE_MOD
+	ApplyLockedTunings(false); // zone tunings + locked overrides into gamecore
+#else
 	m_Core.m_Tuning = TuningList()[m_TuneZone]; // throw tunings from specific zone into gamecore
+#endif
 
 	if(m_TuneZone != m_TuneZoneOld) // don't send tunigs all the time
 	{
@@ -2273,7 +2626,11 @@ void CCharacter::DDRaceTick()
 	}
 	if(m_FreezeTime > 0)
 	{
-		if(m_FreezeTime % Server()->TickSpeed() == Server()->TickSpeed() - 1)
+		if(m_FreezeTime % Server()->TickSpeed() == Server()->TickSpeed() - 1
+#ifdef CONF_FDDRACE_MOD
+			&& m_pPlayer->m_Minigame != MINIGAME_INSTAGIB_FNG && m_pPlayer->m_Minigame != MINIGAME_INSTAGIB_BOOMFNG
+#endif
+		)
 		{
 			GameServer()->CreateDamageInd(m_Pos, 0, (m_FreezeTime + 1) / Server()->TickSpeed(), TeamMask() & GameServer()->ClientsMaskExcludeClientVersionAndHigher(VERSION_DDNET_NEW_HUD));
 		}
@@ -2439,6 +2796,8 @@ void CCharacter::ResetJumps()
 
 void CCharacter::GiveWeapon(int Weapon, bool Remove)
 {
+	if(Weapon < 0 || Weapon >= NUM_FDDRACE_WEAPONS)
+		return;
 	if(Weapon == WEAPON_NINJA)
 	{
 		if(Remove)
@@ -2460,6 +2819,116 @@ void CCharacter::GiveWeapon(int Weapon, bool Remove)
 
 	m_Core.m_aWeapons[Weapon].m_Got = !Remove;
 }
+
+#ifdef CONF_FDDRACE_MOD
+void CCharacter::ApplyLockedTunings(bool SendTuningParams)
+{
+	CTuningParams *pTunings = m_TuneZone > 0 ? &GameServer()->TuningList()[m_TuneZone] : GameServer()->Tuning();
+	m_Core.m_Tuning = *GameServer()->ApplyLockedTunings(pTunings, m_LockedTunings);
+	m_IsFrozen = m_FreezeTime > 0 || m_Core.m_DeepFrozen || m_DeepFreeze;
+	if(SendTuningParams)
+	{
+		GameServer()->SendTuningParams(m_pPlayer->GetCid(), m_TuneZone);
+		m_LastLockedTunings = m_LockedTunings;
+	}
+}
+
+void CCharacter::DropFlag(int Dir)
+{
+	for(int i = 0; i < 2; i++)
+	{
+		CFlag *pFlag = GameServer()->GetFlag(i);
+		if(pFlag && pFlag->GetCarrier() == this)
+			pFlag->Drop(Dir == -3 ? GetAimDir() : Dir);
+	}
+}
+
+bool CCharacter::CanDropWeapon(int Type) const
+{
+	if(Type < 0 || Type >= NUM_FDDRACE_WEAPONS)
+		return false;
+	if(!m_Core.m_aWeapons[Type].m_Got)
+		return false;
+	if(Type == WEAPON_HAMMER || Type == WEAPON_GUN || Type == WEAPON_DRAW_EDITOR)
+		return false;
+	if(Type == WEAPON_NINJA)
+		return false;
+	return true;
+}
+
+void CCharacter::DropWeapon(int WeaponId, bool OnDeath, float Dir)
+{
+	if(WeaponId < 0)
+		WeaponId = GetActiveWeapon();
+	if(!CanDropWeapon(WeaponId))
+		return;
+	if(g_Config.m_SvMaxWeaponDrops <= 0)
+		return;
+	if(!OnDeath && (m_FreezeTime || !g_Config.m_SvDropWeapons))
+		return;
+
+	if(!g_Config.m_SvAllowEmptyInventory)
+	{
+		int Count = 0;
+		for(int i = 0; i < NUM_FDDRACE_WEAPONS; i++)
+		{
+			if(i == WEAPON_HAMMER || i == WEAPON_GUN || i == WEAPON_NINJA || i == WEAPON_DRAW_EDITOR)
+				continue;
+			if(m_Core.m_aWeapons[i].m_Got)
+				Count++;
+		}
+		if(Count < 2)
+			return;
+	}
+
+	const float DropDir = Dir == -3.f ? (float)GetAimDir() : Dir;
+	GameServer()->CreateSound(m_Pos, SOUND_WEAPON_NOAMMO, TeamMask());
+	new CPickupDrop(GameWorld(), m_Pos, POWERUP_WEAPON, m_pPlayer->GetCid(), DropDir, 300, WeaponId);
+	GiveWeapon(WeaponId, true);
+	SetWeapon(WEAPON_GUN);
+}
+
+bool CCharacter::DropGrog(float Dir, bool OnDeath)
+{
+	return m_NumGrogsHolding && m_pGrog && m_pGrog->Drop(Dir, OnDeath);
+}
+
+bool CCharacter::TryMountHelicopter()
+{
+	if(m_FreezeTime)
+		return false;
+
+	CEntity *apEnts[8];
+	const int Num = GameWorld()->FindEntities(m_Pos, 300.f, apEnts, 8, CGameWorld::ENTTYPE_HELICOPTER);
+	CHelicopter *pClosest = nullptr;
+	float Best = 300.f;
+	for(int i = 0; i < Num; i++)
+	{
+		auto *pHeli = static_cast<CHelicopter *>(apEnts[i]);
+		if(!pHeli)
+			continue;
+		const float Dist = distance(m_Pos, pHeli->GetPos());
+		if(Dist < Best)
+		{
+			Best = Dist;
+			pClosest = pHeli;
+		}
+	}
+	return pClosest && pClosest->Mount(m_pPlayer->GetCid());
+}
+
+int CCharacter::GetTaserStrength()
+{
+	const int AccId = m_pPlayer->GetAccID();
+	int TaserLevel = AccId >= ACC_START ? 0 : g_Config.m_SvTaserStrengthDefault;
+	if(const SAccountInfo *pAcc = GameServer()->Accounts()->Get(AccId))
+	{
+		if(AccId >= ACC_START)
+			TaserLevel = pAcc->m_TaserLevel;
+	}
+	return std::clamp((int)((Server()->Tick() - m_LastTaserUse) * 2 / Server()->TickSpeed()), 0, TaserLevel);
+}
+#endif
 
 void CCharacter::GiveAllWeapons()
 {

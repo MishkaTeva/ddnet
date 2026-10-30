@@ -7,6 +7,7 @@
 #include <generated/protocol.h>
 
 #include <game/mapitems.h>
+#include <game/server/entities/character.h>
 #include <game/server/gamecontext.h>
 #include <game/server/player.h>
 #include <game/teamscore.h>
@@ -34,6 +35,10 @@ void CPickup::Reset()
 
 void CPickup::Tick()
 {
+#ifdef CONF_FDDRACE_MOD
+	if(m_BrushCID != -1)
+		return;
+#endif
 	Move();
 
 	// Check if a player intersected us
@@ -169,6 +174,12 @@ void CPickup::Snap(int SnappingClient)
 {
 	if(NetworkClipped(SnappingClient) || !GetId().has_value())
 		return;
+
+#ifdef CONF_FDDRACE_MOD
+	CCharacter *pSnapChr = GameServer()->GetPlayerChar(SnappingClient);
+	if(pSnapChr && pSnapChr->m_DrawEditor.OnSnapPreview(this))
+		return;
+#endif
 
 	int SnappingClientVersion = GameServer()->GetClientVersion(SnappingClient);
 	bool Sixup = Server()->IsSixup(SnappingClient);

@@ -218,6 +218,7 @@ public:
 		bool m_Sixup;
 
 #ifdef CONF_FDDRACE_MOD
+		bool m_Main;
 		bool m_SentIamTater;
 		bool m_TClientVerified;
 		bool m_HasHardcodedHash;
@@ -570,6 +571,8 @@ public:
 	bool IsClientTClientVerified(int ClientId) const override;
 	bool IsClientHardcodedHash(int ClientId) const override;
 	bool IsOldClient(int ClientId) const override;
+	bool IsMain(int ClientId) const override;
+	int GetDummy(int ClientId) const override;
 #else
 	CAntiCheat *AntiCheat() override { return nullptr; }
 	const char *GetClientVersionStr(int ClientId) const override { (void)ClientId; return ""; }
@@ -593,6 +596,8 @@ public:
 	bool IsClientTClientVerified(int ClientId) const override { (void)ClientId; return false; }
 	bool IsClientHardcodedHash(int ClientId) const override { (void)ClientId; return false; }
 	bool IsOldClient(int ClientId) const override { (void)ClientId; return false; }
+	bool IsMain(int ClientId) const override { (void)ClientId; return true; }
+	int GetDummy(int ClientId) const override { (void)ClientId; return -1; }
 #endif
 	int GetMaxClients(int ClientId) const override;
 	bool ClientSupportsServerMaxClients(int ClientId) const override;

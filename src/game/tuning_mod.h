@@ -40,5 +40,6 @@ MACRO_TUNING_PARAM(LightningLaserLength, lightning_laser_length, 70, "Length of 
 
 MACRO_TUNING_PARAM(Elasticity, elasticity, 0, "Elasticity, bouncing off of blocks")
 MACRO_TUNING_PARAM(NumSpreadShots, num_spread_shots, 3, "Number of shots for the spread weapons")
+MACRO_TUNING_PARAM(SpreadAngle, spread_angle, 360, "Spread angle in degrees: 360 = full circle, smaller = cone in front")
 
 #endif

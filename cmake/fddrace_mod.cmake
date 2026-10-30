@@ -13,9 +13,31 @@ set(FDDRACE_MOD_GAME_SRC
   src/mod/game/server/account.cpp
   src/mod/game/server/account.h
   src/mod/game/server/account_commands.cpp
+  src/mod/game/server/fddrace_save.cpp
+  src/mod/game/server/fddrace_save.h
   src/mod/game/server/grog_character.cpp
   src/mod/game/server/versioncheck.cpp
   src/mod/game/server/versioncheck.h
+  src/mod/game/server/votingmenu.cpp
+  src/mod/game/server/votingmenu.h
+  src/mod/game/server/minigames/minigame.cpp
+  src/mod/game/server/minigames/minigame.h
+  src/mod/game/server/minigames/fng.cpp
+  src/mod/game/server/minigames/fng.h
+  src/mod/game/server/minigames/arenas.cpp
+  src/mod/game/server/minigames/arenas.h
+  src/mod/game/server/minigames/survival.cpp
+  src/mod/game/server/minigames/survival.h
+  src/mod/game/server/minigames/durak.cpp
+  src/mod/game/server/minigames/durak.h
+  src/mod/game/server/houses/house.cpp
+  src/mod/game/server/houses/house.h
+  src/mod/game/server/houses/shop.cpp
+  src/mod/game/server/houses/shop.h
+  src/mod/game/server/houses/bank.cpp
+  src/mod/game/server/houses/bank.h
+  src/mod/game/server/houses/tavern.cpp
+  src/mod/game/server/houses/tavern.h
   src/mod/game/server/entities/lasertext.cpp
   src/mod/game/server/entities/lasertext.h
   src/mod/game/server/entities/money.cpp
@@ -72,6 +94,24 @@ set(FDDRACE_MOD_GAME_SRC
   src/mod/game/server/entities/lightninglaser.h
   src/mod/game/server/entities/grog.cpp
   src/mod/game/server/entities/grog.h
+  src/mod/game/server/entities/button.cpp
+  src/mod/game/server/entities/button.h
+	src/mod/game/server/entities/advanced_entity.cpp
+  src/mod/game/server/entities/advanced_entity.h
+  src/mod/game/server/entities/helicopter.cpp
+  src/mod/game/server/entities/helicopter.h
+  src/mod/game/server/entities/helicopter/bone.cpp
+  src/mod/game/server/entities/helicopter/bone.h
+  src/mod/game/server/entities/helicopter/helicopter_turret.cpp
+  src/mod/game/server/entities/helicopter/helicopter_turret.h
+  src/mod/game/server/entities/flag.cpp
+  src/mod/game/server/entities/flag.h
+  src/mod/game/server/entities/speedup.cpp
+  src/mod/game/server/entities/speedup.h
+  src/mod/game/server/entities/missile.cpp
+  src/mod/game/server/entities/missile.h
+  src/mod/game/server/draweditor.cpp
+  src/mod/game/server/draweditor.h
 )
 
 set(FDDRACE_MOD_SRC

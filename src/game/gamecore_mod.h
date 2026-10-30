@@ -7,6 +7,29 @@
 
 #include "collision_mod.h"
 
+#include <cstring>
+
+class CLockedTune
+{
+public:
+	char m_aParam[64];
+	CTuneParam m_Value;
+
+	CLockedTune(const char *pParam, float Value)
+	{
+		std::memset(m_aParam, 0, sizeof(m_aParam));
+		if(pParam)
+			std::strncpy(m_aParam, pParam, sizeof(m_aParam) - 1);
+		m_Value = Value;
+	}
+
+	bool operator==(const CLockedTune &Tune) const
+	{
+		return std::strncmp(m_aParam, Tune.m_aParam, sizeof(m_aParam)) == 0 && m_Value.Get() == Tune.m_Value.Get();
+	}
+};
+typedef std::vector<CLockedTune> LOCKED_TUNES;
+
 enum
 {
 	HOOK_FLAG_RED = MAX_CLIENTS,

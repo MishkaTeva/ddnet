@@ -9,7 +9,7 @@
 class CLaser : public CEntity
 {
 public:
-	CLaser(CGameWorld *pGameWorld, vec2 Pos, vec2 Direction, float StartEnergy, int Owner, int Type);
+	CLaser(CGameWorld *pGameWorld, vec2 Pos, vec2 Direction, float StartEnergy, int Owner, int Type, int TaserStrength = 0);
 
 	void Reset() override;
 	void Tick() override;
@@ -43,6 +43,7 @@ private:
 	bool m_TeleportCancelled;
 	bool m_IsBlueTeleport;
 	bool m_BelongsToPracticeTeam;
+	int m_TaserStrength = 0;
 	void SyncInteractState();
 };
 

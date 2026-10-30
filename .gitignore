@@ -161,3 +161,8 @@ tags
 discord_bot.token
 
 data/accounts/
+
+_adapt*
+_build*
+_err*
+

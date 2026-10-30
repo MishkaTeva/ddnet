@@ -1,5 +1,7 @@
 #include "account.h"
 
+#include <algorithm>
+
 #include <engine/shared/config.h>
 
 #include <game/server/entities/character.h>
@@ -10,11 +12,14 @@
 
 #include <mod/game/server/entities/atom.h>
 #include <mod/game/server/entities/ban_plunger_toilet.h>
+#include <mod/game/server/entities/button.h>
 #include <mod/game/server/entities/clock.h>
 #include <mod/game/server/entities/custom_projectile.h>
 #include <mod/game/server/entities/epic_circle.h>
 #include <mod/game/server/entities/grog.h>
+#include <mod/game/server/entities/helicopter.h>
 #include <mod/game/server/entities/kick_boot.h>
+#include <mod/game/server/entities/speedup.h>
 #include <mod/game/server/entities/lightsaber.h>
 #include <mod/game/server/entities/lightninglaser.h>
 #include <mod/game/server/entities/lovely.h>
@@ -31,6 +36,8 @@
 #include <mod/game/server/entities/taser_shield.h>
 #include <mod/game/server/entities/trail.h>
 #include <mod/game/server/entities/unmute_spark.h>
+#include <mod/game/server/draweditor.h>
+#include <game/weapons_ex.h>
 
 #ifdef CONF_FDDRACE_MOD
 
@@ -79,7 +86,7 @@ void CGameContext::ConLogout(IConsole::IResult *pResult, void *pUserData)
 void CGameContext::ConGiveRoomKey(IConsole::IResult *pResult, void *pUserData)
 {
 	CGameContext *pSelf = (CGameContext *)pUserData;
-	const int ClientId = pResult->GetVictim();
+	const int ClientId = pResult->GetVictim(0);
 	if(ClientId < 0 || ClientId >= MAX_CLIENTS || !pSelf->m_apPlayers[ClientId])
 	{
 		pSelf->Console()->Print(IConsole::OUTPUT_LEVEL_STANDARD, "account", "Invalid player");
@@ -94,7 +101,7 @@ void CGameContext::ConGiveRoomKey(IConsole::IResult *pResult, void *pUserData)
 void CGameContext::ConGiveVipPlus(IConsole::IResult *pResult, void *pUserData)
 {
 	CGameContext *pSelf = (CGameContext *)pUserData;
-	const int ClientId = pResult->GetVictim();
+	const int ClientId = pResult->GetVictim(0);
 	if(ClientId < 0 || ClientId >= MAX_CLIENTS || !pSelf->m_apPlayers[ClientId])
 	{
 		pSelf->Console()->Print(IConsole::OUTPUT_LEVEL_STANDARD, "account", "Invalid player");
@@ -116,19 +123,19 @@ void CGameContext::ConGiveVipPlus(IConsole::IResult *pResult, void *pUserData)
 void CGameContext::ConJailArrest(IConsole::IResult *pResult, void *pUserData)
 {
 	CGameContext *pSelf = (CGameContext *)pUserData;
-	pSelf->Accounts()->JailPlayer(pResult->GetVictim(), pResult->GetInteger(1));
+	pSelf->Accounts()->JailPlayer(pResult->GetVictim(0), pResult->GetInteger(1));
 }
 
 void CGameContext::ConJailRelease(IConsole::IResult *pResult, void *pUserData)
 {
 	CGameContext *pSelf = (CGameContext *)pUserData;
-	pSelf->Accounts()->ReleaseJail(pResult->GetVictim());
+	pSelf->Accounts()->ReleaseJail(pResult->GetVictim(0));
 }
 
 void CGameContext::ConLaserText(IConsole::IResult *pResult, void *pUserData)
 {
 	CGameContext *pSelf = (CGameContext *)pUserData;
-	const int ClientId = pResult->GetVictim();
+	const int ClientId = pResult->GetVictim(0);
 	CPlayer *pPlayer = pSelf->m_apPlayers[ClientId];
 	if(!pPlayer || !pPlayer->GetCharacter())
 		return;
@@ -138,7 +145,7 @@ void CGameContext::ConLaserText(IConsole::IResult *pResult, void *pUserData)
 void CGameContext::ConDropMoney(IConsole::IResult *pResult, void *pUserData)
 {
 	CGameContext *pSelf = (CGameContext *)pUserData;
-	const int ClientId = pResult->GetVictim();
+	const int ClientId = pResult->GetVictim(0);
 	CPlayer *pPlayer = pSelf->m_apPlayers[ClientId];
 	if(!pPlayer || !pPlayer->GetCharacter())
 		return;
@@ -149,7 +156,7 @@ void CGameContext::ConDropMoney(IConsole::IResult *pResult, void *pUserData)
 void CGameContext::ConToggleLovely(IConsole::IResult *pResult, void *pUserData)
 {
 	CGameContext *pSelf = (CGameContext *)pUserData;
-	const int ClientId = pResult->GetVictim();
+	const int ClientId = pResult->GetVictim(0);
 	CCharacter *pChr = pSelf->GetPlayerChar(ClientId);
 	if(!pChr)
 		return;
@@ -162,7 +169,7 @@ void CGameContext::ConToggleLovely(IConsole::IResult *pResult, void *pUserData)
 void CGameContext::ConToggleStaffInd(IConsole::IResult *pResult, void *pUserData)
 {
 	CGameContext *pSelf = (CGameContext *)pUserData;
-	const int ClientId = pResult->GetVictim();
+	const int ClientId = pResult->GetVictim(0);
 	CCharacter *pChr = pSelf->GetPlayerChar(ClientId);
 	if(!pChr)
 		return;
@@ -175,7 +182,7 @@ void CGameContext::ConToggleStaffInd(IConsole::IResult *pResult, void *pUserData
 void CGameContext::ConSpawnFlyingPoint(IConsole::IResult *pResult, void *pUserData)
 {
 	CGameContext *pSelf = (CGameContext *)pUserData;
-	const int FromId = pResult->GetVictim();
+	const int FromId = pResult->GetVictim(0);
 	const int ToId = pResult->GetInteger(1);
 	CCharacter *pFrom = pSelf->GetPlayerChar(FromId);
 	if(!pFrom)
@@ -186,7 +193,7 @@ void CGameContext::ConSpawnFlyingPoint(IConsole::IResult *pResult, void *pUserDa
 void CGameContext::ConToggleRotatingBall(IConsole::IResult *pResult, void *pUserData)
 {
 	CGameContext *pSelf = (CGameContext *)pUserData;
-	const int ClientId = pResult->GetVictim();
+	const int ClientId = pResult->GetVictim(0);
 	CCharacter *pChr = pSelf->GetPlayerChar(ClientId);
 	if(!pChr)
 		return;
@@ -199,7 +206,7 @@ void CGameContext::ConToggleRotatingBall(IConsole::IResult *pResult, void *pUser
 void CGameContext::ConToggleAtom(IConsole::IResult *pResult, void *pUserData)
 {
 	CGameContext *pSelf = (CGameContext *)pUserData;
-	const int ClientId = pResult->GetVictim();
+	const int ClientId = pResult->GetVictim(0);
 	CCharacter *pChr = pSelf->GetPlayerChar(ClientId);
 	if(!pChr)
 		return;
@@ -212,7 +219,7 @@ void CGameContext::ConToggleAtom(IConsole::IResult *pResult, void *pUserData)
 void CGameContext::ConToggleTrail(IConsole::IResult *pResult, void *pUserData)
 {
 	CGameContext *pSelf = (CGameContext *)pUserData;
-	const int ClientId = pResult->GetVictim();
+	const int ClientId = pResult->GetVictim(0);
 	CCharacter *pChr = pSelf->GetPlayerChar(ClientId);
 	if(!pChr)
 		return;
@@ -225,7 +232,7 @@ void CGameContext::ConToggleTrail(IConsole::IResult *pResult, void *pUserData)
 void CGameContext::ConToggleEpicCircle(IConsole::IResult *pResult, void *pUserData)
 {
 	CGameContext *pSelf = (CGameContext *)pUserData;
-	const int ClientId = pResult->GetVictim();
+	const int ClientId = pResult->GetVictim(0);
 	CCharacter *pChr = pSelf->GetPlayerChar(ClientId);
 	if(!pChr)
 		return;
@@ -238,7 +245,7 @@ void CGameContext::ConToggleEpicCircle(IConsole::IResult *pResult, void *pUserDa
 void CGameContext::ConMuteGagFx(IConsole::IResult *pResult, void *pUserData)
 {
 	CGameContext *pSelf = (CGameContext *)pUserData;
-	const int ClientId = pResult->GetVictim();
+	const int ClientId = pResult->GetVictim(0);
 	CCharacter *pChr = pSelf->GetPlayerChar(ClientId);
 	if(!pChr)
 		return;
@@ -248,7 +255,7 @@ void CGameContext::ConMuteGagFx(IConsole::IResult *pResult, void *pUserData)
 void CGameContext::ConKickBootFx(IConsole::IResult *pResult, void *pUserData)
 {
 	CGameContext *pSelf = (CGameContext *)pUserData;
-	const int ClientId = pResult->GetVictim();
+	const int ClientId = pResult->GetVictim(0);
 	CCharacter *pChr = pSelf->GetPlayerChar(ClientId);
 	if(!pChr)
 		return;
@@ -259,7 +266,7 @@ void CGameContext::ConKickBootFx(IConsole::IResult *pResult, void *pUserData)
 void CGameContext::ConUnmuteSparkFx(IConsole::IResult *pResult, void *pUserData)
 {
 	CGameContext *pSelf = (CGameContext *)pUserData;
-	const int ClientId = pResult->GetVictim();
+	const int ClientId = pResult->GetVictim(0);
 	CCharacter *pChr = pSelf->GetPlayerChar(ClientId);
 	if(!pChr)
 		return;
@@ -269,7 +276,7 @@ void CGameContext::ConUnmuteSparkFx(IConsole::IResult *pResult, void *pUserData)
 void CGameContext::ConSpawnPortal(IConsole::IResult *pResult, void *pUserData)
 {
 	CGameContext *pSelf = (CGameContext *)pUserData;
-	const int ClientId = pResult->GetVictim();
+	const int ClientId = pResult->GetVictim(0);
 	CPlayer *pPlayer = pSelf->m_apPlayers[ClientId];
 	CCharacter *pChr = pSelf->GetPlayerChar(ClientId);
 	if(!pPlayer || !pChr)
@@ -278,6 +285,22 @@ void CGameContext::ConSpawnPortal(IConsole::IResult *pResult, void *pUserData)
 	vec2 PortalPos = pChr->GetPos();
 	if(pResult->NumArguments() >= 3)
 		PortalPos = vec2((float)pResult->GetInteger(1), (float)pResult->GetInteger(2));
+
+	if(g_Config.m_SvPortalRifleAmmo)
+	{
+		const int AccId = pSelf->Accounts()->FindByClientId(ClientId);
+		const SAccountInfo *pAcc = pSelf->Accounts()->Get(AccId);
+		if(!pAcc || AccId < ACC_START || !pAcc->m_LoggedIn)
+		{
+			pSelf->Console()->Print(IConsole::OUTPUT_LEVEL_STANDARD, "portal", "Login required for portal ammo");
+			return;
+		}
+		if(pAcc->m_PortalBattery <= 0)
+		{
+			pSelf->Console()->Print(IConsole::OUTPUT_LEVEL_STANDARD, "portal", "No portal battery");
+			return;
+		}
+	}
 
 	if(pPlayer->m_apPortal[PORTAL_FIRST] && pPlayer->m_apPortal[PORTAL_SECOND])
 	{
@@ -292,6 +315,11 @@ void CGameContext::ConSpawnPortal(IConsole::IResult *pResult, void *pUserData)
 	{
 		if(pPlayer->m_apPortal[i])
 			continue;
+		if(g_Config.m_SvPortalRifleAmmo && !pPlayer->GivePortalBattery(-1))
+		{
+			pSelf->Console()->Print(IConsole::OUTPUT_LEVEL_STANDARD, "portal", "No portal battery");
+			return;
+		}
 		pPlayer->m_apPortal[i] = new CPortal(&pSelf->m_World, PortalPos, ClientId);
 		if(i == PORTAL_SECOND && pPlayer->m_apPortal[PORTAL_FIRST])
 		{
@@ -308,7 +336,7 @@ void CGameContext::ConSpawnPortal(IConsole::IResult *pResult, void *pUserData)
 void CGameContext::ConClearPortals(IConsole::IResult *pResult, void *pUserData)
 {
 	CGameContext *pSelf = (CGameContext *)pUserData;
-	const int ClientId = pResult->GetVictim();
+	const int ClientId = pResult->GetVictim(0);
 	CPlayer *pPlayer = pSelf->m_apPlayers[ClientId];
 	if(!pPlayer)
 		return;
@@ -324,7 +352,7 @@ void CGameContext::ConClearPortals(IConsole::IResult *pResult, void *pUserData)
 void CGameContext::ConSpawnClock(IConsole::IResult *pResult, void *pUserData)
 {
 	CGameContext *pSelf = (CGameContext *)pUserData;
-	const int ClientId = pResult->GetVictim();
+	const int ClientId = pResult->GetVictim(0);
 	CCharacter *pChr = pSelf->GetPlayerChar(ClientId);
 	if(!pChr)
 		return;
@@ -338,7 +366,7 @@ void CGameContext::ConSpawnClock(IConsole::IResult *pResult, void *pUserData)
 void CGameContext::ConLightsaber(IConsole::IResult *pResult, void *pUserData)
 {
 	CGameContext *pSelf = (CGameContext *)pUserData;
-	const int ClientId = pResult->GetVictim();
+	const int ClientId = pResult->GetVictim(0);
 	CCharacter *pChr = pSelf->GetPlayerChar(ClientId);
 	if(!pChr)
 		return;
@@ -370,7 +398,7 @@ void CGameContext::ConLightsaber(IConsole::IResult *pResult, void *pUserData)
 void CGameContext::ConBanPlungerFx(IConsole::IResult *pResult, void *pUserData)
 {
 	CGameContext *pSelf = (CGameContext *)pUserData;
-	const int ClientId = pResult->GetVictim();
+	const int ClientId = pResult->GetVictim(0);
 	CCharacter *pChr = pSelf->GetPlayerChar(ClientId);
 	if(!pChr)
 		return;
@@ -384,7 +412,7 @@ void CGameContext::ConBanPlungerFx(IConsole::IResult *pResult, void *pUserData)
 void CGameContext::ConSpawnStableProjectile(IConsole::IResult *pResult, void *pUserData)
 {
 	CGameContext *pSelf = (CGameContext *)pUserData;
-	const int ClientId = pResult->GetVictim();
+	const int ClientId = pResult->GetVictim(0);
 	CCharacter *pChr = pSelf->GetPlayerChar(ClientId);
 	if(!pChr)
 		return;
@@ -401,7 +429,7 @@ void CGameContext::ConSpawnStableProjectile(IConsole::IResult *pResult, void *pU
 void CGameContext::ConDropPickup(IConsole::IResult *pResult, void *pUserData)
 {
 	CGameContext *pSelf = (CGameContext *)pUserData;
-	const int ClientId = pResult->GetVictim();
+	const int ClientId = pResult->GetVictim(0);
 	CCharacter *pChr = pSelf->GetPlayerChar(ClientId);
 	if(!pChr)
 		return;
@@ -442,7 +470,7 @@ void CGameContext::ConDropPickup(IConsole::IResult *pResult, void *pUserData)
 void CGameContext::ConSpawnCustomProjectile(IConsole::IResult *pResult, void *pUserData)
 {
 	CGameContext *pSelf = (CGameContext *)pUserData;
-	const int ClientId = pResult->GetVictim();
+	const int ClientId = pResult->GetVictim(0);
 	CCharacter *pChr = pSelf->GetPlayerChar(ClientId);
 	if(!pChr)
 		return;
@@ -479,7 +507,7 @@ void CGameContext::ConSpawnCustomProjectile(IConsole::IResult *pResult, void *pU
 void CGameContext::ConSpawnTeleporter(IConsole::IResult *pResult, void *pUserData)
 {
 	CGameContext *pSelf = (CGameContext *)pUserData;
-	const int ClientId = pResult->GetVictim();
+	const int ClientId = pResult->GetVictim(0);
 	CCharacter *pChr = pSelf->GetPlayerChar(ClientId);
 	if(!pChr)
 		return;
@@ -514,7 +542,7 @@ void CGameContext::ConSpawnTeleporter(IConsole::IResult *pResult, void *pUserDat
 void CGameContext::ConSpawnMeteor(IConsole::IResult *pResult, void *pUserData)
 {
 	CGameContext *pSelf = (CGameContext *)pUserData;
-	const int ClientId = pResult->GetVictim();
+	const int ClientId = pResult->GetVictim(0);
 	CCharacter *pChr = pSelf->GetPlayerChar(ClientId);
 	if(!pChr || !pSelf->m_apPlayers[ClientId])
 		return;
@@ -530,7 +558,7 @@ void CGameContext::ConSpawnMeteor(IConsole::IResult *pResult, void *pUserData)
 void CGameContext::ConClearMeteors(IConsole::IResult *pResult, void *pUserData)
 {
 	CGameContext *pSelf = (CGameContext *)pUserData;
-	const int ClientId = pResult->GetVictim();
+	const int ClientId = pResult->GetVictim(0);
 	CCharacter *pChr = pSelf->GetPlayerChar(ClientId);
 	if(pSelf->m_apPlayers[ClientId])
 		pSelf->m_apPlayers[ClientId]->m_InfMeteors = 0;
@@ -542,7 +570,7 @@ void CGameContext::ConClearMeteors(IConsole::IResult *pResult, void *pUserData)
 void CGameContext::ConSpawnPlayerCounter(IConsole::IResult *pResult, void *pUserData)
 {
 	CGameContext *pSelf = (CGameContext *)pUserData;
-	const int ClientId = pResult->GetVictim();
+	const int ClientId = pResult->GetVictim(0);
 	CCharacter *pChr = pSelf->GetPlayerChar(ClientId);
 	if(!pChr)
 		return;
@@ -565,7 +593,7 @@ void CGameContext::ConUpdatePlayerCounter(IConsole::IResult *pResult, void *pUse
 void CGameContext::ConTaserShieldFx(IConsole::IResult *pResult, void *pUserData)
 {
 	CGameContext *pSelf = (CGameContext *)pUserData;
-	const int ClientId = pResult->GetVictim();
+	const int ClientId = pResult->GetVictim(0);
 	CCharacter *pChr = pSelf->GetPlayerChar(ClientId);
 	if(!pChr)
 		return;
@@ -576,7 +604,7 @@ void CGameContext::ConTaserShieldFx(IConsole::IResult *pResult, void *pUserData)
 void CGameContext::ConPortalBlocker(IConsole::IResult *pResult, void *pUserData)
 {
 	CGameContext *pSelf = (CGameContext *)pUserData;
-	const int ClientId = pResult->GetVictim();
+	const int ClientId = pResult->GetVictim(0);
 	CCharacter *pChr = pSelf->GetPlayerChar(ClientId);
 	if(!pChr)
 		return;
@@ -602,7 +630,7 @@ void CGameContext::ConPortalBlocker(IConsole::IResult *pResult, void *pUserData)
 void CGameContext::ConLightningLaser(IConsole::IResult *pResult, void *pUserData)
 {
 	CGameContext *pSelf = (CGameContext *)pUserData;
-	const int ClientId = pResult->GetVictim();
+	const int ClientId = pResult->GetVictim(0);
 	CCharacter *pChr = pSelf->GetPlayerChar(ClientId);
 	if(!pChr)
 		return;
@@ -618,7 +646,7 @@ void CGameContext::ConLightningLaser(IConsole::IResult *pResult, void *pUserData
 void CGameContext::ConGiveGrog(IConsole::IResult *pResult, void *pUserData)
 {
 	CGameContext *pSelf = (CGameContext *)pUserData;
-	const int ClientId = pResult->GetVictim();
+	const int ClientId = pResult->GetVictim(0);
 	CCharacter *pChr = pSelf->GetPlayerChar(ClientId);
 	if(!pChr)
 		return;
@@ -631,7 +659,7 @@ void CGameContext::ConGiveGrog(IConsole::IResult *pResult, void *pUserData)
 void CGameContext::ConGrogSip(IConsole::IResult *pResult, void *pUserData)
 {
 	CGameContext *pSelf = (CGameContext *)pUserData;
-	const int ClientId = pResult->GetVictim();
+	const int ClientId = pResult->GetVictim(0);
 	CCharacter *pChr = pSelf->GetPlayerChar(ClientId);
 	if(!pChr || !pChr->m_pGrog)
 		return;
@@ -641,11 +669,410 @@ void CGameContext::ConGrogSip(IConsole::IResult *pResult, void *pUserData)
 void CGameContext::ConGrogDrop(IConsole::IResult *pResult, void *pUserData)
 {
 	CGameContext *pSelf = (CGameContext *)pUserData;
-	const int ClientId = pResult->GetVictim();
+	const int ClientId = pResult->GetVictim(0);
 	CCharacter *pChr = pSelf->GetPlayerChar(ClientId);
 	if(!pChr || !pChr->m_pGrog)
 		return;
 	pChr->m_pGrog->Drop();
+}
+
+void CGameContext::ConSaveDrop(IConsole::IResult *pResult, void *pUserData)
+{
+	CGameContext *pSelf = (CGameContext *)pUserData;
+	const int Victim = pResult->GetVictim(0);
+	if(!CheckClientId(Victim) || !pSelf->m_apPlayers[Victim])
+		return;
+	const float Hours = pResult->NumArguments() >= 2 ? pResult->GetFloat(1) : 6.f;
+	const char *pReason = pResult->NumArguments() >= 3 ? pResult->GetString(2) : "save drop";
+	pSelf->m_FddraceSave.SaveDrop(Victim, Hours, pReason);
+}
+
+void CGameContext::ConListSavedTees(IConsole::IResult *pResult, void *pUserData)
+{
+	(void)pResult;
+	CGameContext *pSelf = (CGameContext *)pUserData;
+	pSelf->m_FddraceSave.ListSavedTees();
+}
+
+void CGameContext::ConWalletAdd(IConsole::IResult *pResult, void *pUserData)
+{
+	CGameContext *pSelf = (CGameContext *)pUserData;
+	const int ClientId = pResult->GetVictim(0);
+	CPlayer *pPlayer = pSelf->m_apPlayers[ClientId];
+	if(!pPlayer)
+		return;
+	pPlayer->WalletTransaction(pResult->GetInteger(1));
+}
+
+void CGameContext::ConSpawnButton(IConsole::IResult *pResult, void *pUserData)
+{
+	CGameContext *pSelf = (CGameContext *)pUserData;
+	const int ClientId = pResult->GetVictim(0);
+	CCharacter *pChr = pSelf->GetPlayerChar(ClientId);
+	if(!pChr)
+		return;
+	int Number = pResult->NumArguments() > 1 ? pResult->GetInteger(1) : 1;
+	if(Number < 1)
+		Number = 1;
+	if(Number > 255)
+		Number = 255;
+	vec2 Pos = pChr->GetPos();
+	Pos.x = (float)(round_to_int(Pos.x) / 32 * 32 + 16);
+	Pos.y = (float)(round_to_int(Pos.y) / 32 * 32 + 16);
+	new CButton(&pSelf->m_World, Pos, Number);
+	pSelf->Console()->Print(IConsole::OUTPUT_LEVEL_STANDARD, "button", "Spawned");
+}
+
+void CGameContext::ConSpawnHelicopter(IConsole::IResult *pResult, void *pUserData)
+{
+	CGameContext *pSelf = (CGameContext *)pUserData;
+	const int ClientId = pResult->GetVictim(0);
+	CCharacter *pChr = pSelf->GetPlayerChar(ClientId);
+	if(!pChr)
+		return;
+	new CHelicopter(&pSelf->m_World, pChr->GetPos() + vec2(0, -48), ClientId, TURRETTYPE_LAUNCHER, true);
+	pSelf->Console()->Print(IConsole::OUTPUT_LEVEL_STANDARD, "helicopter", "Spawned");
+}
+
+void CGameContext::ConForceFlagOwner(IConsole::IResult *pResult, void *pUserData)
+{
+	CGameContext *pSelf = (CGameContext *)pUserData;
+	const int Team = pResult->GetInteger(0);
+	const int Victim = pResult->NumArguments() > 1 ? pResult->GetInteger(1) : -1;
+	pSelf->ForceFlagOwner(Victim, Team);
+}
+
+void CGameContext::ConSpawnSpeedup(IConsole::IResult *pResult, void *pUserData)
+{
+	CGameContext *pSelf = (CGameContext *)pUserData;
+	const int ClientId = pResult->GetVictim(0);
+	CCharacter *pChr = pSelf->GetPlayerChar(ClientId);
+	if(!pChr)
+		return;
+	const int Angle = pResult->NumArguments() > 1 ? pResult->GetInteger(1) : 0;
+	const int Force = pResult->NumArguments() > 2 ? pResult->GetInteger(2) : 10;
+	const int MaxSpeed = pResult->NumArguments() > 3 ? pResult->GetInteger(3) : 0;
+	vec2 Pos = pChr->GetPos();
+	Pos.x = (float)(round_to_int(Pos.x) / 32 * 32 + 16);
+	Pos.y = (float)(round_to_int(Pos.y) / 32 * 32 + 16);
+	new CSpeedup(&pSelf->m_World, Pos, (float)Angle, Force, MaxSpeed);
+	pSelf->Console()->Print(IConsole::OUTPUT_LEVEL_STANDARD, "speedup", "Spawned");
+}
+
+void CGameContext::ConRedirectClientSafe(IConsole::IResult *pResult, void *pUserData)
+{
+	CGameContext *pSelf = (CGameContext *)pUserData;
+	const int ClientId = pResult->GetVictim(0);
+	CCharacter *pChr = pSelf->GetPlayerChar(ClientId);
+	if(!pChr)
+		return;
+	const int Port = pResult->GetInteger(1);
+	pChr->TrySafelyRedirectClient(Port, true);
+}
+
+void CGameContext::ConDrawTool(IConsole::IResult *pResult, void *pUserData)
+{
+	CGameContext *pSelf = (CGameContext *)pUserData;
+	const int ClientId = pResult->GetVictim(0);
+	CPlayer *pPlayer = pSelf->m_apPlayers[ClientId];
+	CCharacter *pChr = pSelf->GetPlayerChar(ClientId);
+	if(!pPlayer)
+		return;
+	const char *pMode = pResult->NumArguments() > 1 ? pResult->GetString(1) : "off";
+
+	int Category = -1;
+	if(str_comp_nocase(pMode, "speedup") == 0)
+		Category = CDrawEditor::CAT_SPEEDUPS;
+	else if(str_comp_nocase(pMode, "button") == 0)
+		Category = CDrawEditor::CAT_LASERDOORS;
+	else if(str_comp_nocase(pMode, "heli") == 0 || str_comp_nocase(pMode, "helicopter") == 0)
+		Category = CDrawEditor::CAT_HELICOPTER;
+	else if(str_comp_nocase(pMode, "tele") == 0 || str_comp_nocase(pMode, "teleporter") == 0)
+		Category = CDrawEditor::CAT_TELEPORTER;
+
+	// Keep slim m_DrawTool as fallback when character missing.
+	if(Category < 0)
+	{
+		pPlayer->m_DrawTool = -1;
+		if(pChr)
+			pChr->GiveWeapon(WEAPON_DRAW_EDITOR, true);
+		pSelf->Console()->Print(IConsole::OUTPUT_LEVEL_STANDARD, "draw", "draw_tool=off");
+		return;
+	}
+
+	pPlayer->m_DrawTool = -1;
+	if(pChr)
+	{
+		pChr->GiveWeapon(WEAPON_DRAW_EDITOR, false);
+		pChr->SetWeapon(WEAPON_DRAW_EDITOR);
+		pChr->m_DrawEditor.SetCategory(Category);
+	}
+	char aBuf[64];
+	str_format(aBuf, sizeof(aBuf), "draw_tool=%s (WEAPON_DRAW_EDITOR)", pMode);
+	pSelf->Console()->Print(IConsole::OUTPUT_LEVEL_STANDARD, "draw", aBuf);
+}
+
+void CGameContext::ConRoomInvite(IConsole::IResult *pResult, void *pUserData)
+{
+	CGameContext *pSelf = (CGameContext *)pUserData;
+	const int ClientId = pResult->m_ClientId;
+	CPlayer *pPlayer = pSelf->m_apPlayers[ClientId];
+	if(!pPlayer)
+		return;
+	if(!pPlayer->m_HasRoomKey)
+	{
+		pSelf->SendChatTarget(ClientId, "You don't have a room key");
+		return;
+	}
+
+	const int TargetId = pSelf->FindClientIdByName(pResult->GetString(0)).value_or(-1);
+	CCharacter *pChr = pSelf->GetPlayerChar(TargetId);
+	if(TargetId < 0 || !pChr)
+	{
+		pSelf->SendChatTarget(ClientId, "That player doesn't exist");
+		return;
+	}
+	if(pChr->GetPlayer()->m_HasRoomKey)
+	{
+		pSelf->SendChatTarget(ClientId, "This player has a key already");
+		return;
+	}
+	if(pChr->Core()->m_MoveRestrictionExtra.m_RoomKey)
+	{
+		pSelf->SendChatTarget(ClientId, "This player got invited already");
+		return;
+	}
+
+	pChr->Core()->m_MoveRestrictionExtra.m_RoomKey = true;
+	char aBuf[128];
+	str_format(aBuf, sizeof(aBuf), "'%s' invited you to the room", pSelf->Server()->ClientName(ClientId));
+	pSelf->SendChatTarget(TargetId, aBuf);
+	str_format(aBuf, sizeof(aBuf), "You invited '%s' to the room", pSelf->Server()->ClientName(TargetId));
+	pSelf->SendChatTarget(ClientId, aBuf);
+}
+
+void CGameContext::ConRoomKick(IConsole::IResult *pResult, void *pUserData)
+{
+	CGameContext *pSelf = (CGameContext *)pUserData;
+	const int ClientId = pResult->m_ClientId;
+	CPlayer *pPlayer = pSelf->m_apPlayers[ClientId];
+	if(!pPlayer)
+		return;
+	if(!pPlayer->m_HasRoomKey)
+	{
+		pSelf->SendChatTarget(ClientId, "You don't have a room key");
+		return;
+	}
+
+	const int TargetId = pSelf->FindClientIdByName(pResult->GetString(0)).value_or(-1);
+	CCharacter *pChr = pSelf->GetPlayerChar(TargetId);
+	if(TargetId < 0 || !pChr)
+	{
+		pSelf->SendChatTarget(ClientId, "That player doesn't exist");
+		return;
+	}
+	if(pChr->GetPlayer()->m_HasRoomKey)
+	{
+		pSelf->SendChatTarget(ClientId, "You can't kick a key holder");
+		return;
+	}
+	if(!pChr->Core()->m_MoveRestrictionExtra.m_RoomKey)
+	{
+		pSelf->SendChatTarget(ClientId, "This player is not in the room");
+		return;
+	}
+
+	pChr->Core()->m_MoveRestrictionExtra.m_RoomKey = false;
+	char aBuf[128];
+	str_format(aBuf, sizeof(aBuf), "'%s' kicked you from the room", pSelf->Server()->ClientName(ClientId));
+	pSelf->SendChatTarget(TargetId, aBuf);
+	str_format(aBuf, sizeof(aBuf), "You kicked '%s' from the room", pSelf->Server()->ClientName(TargetId));
+	pSelf->SendChatTarget(ClientId, aBuf);
+}
+
+static bool PlayerHasVipPlus(CGameContext *pSelf, int ClientId)
+{
+	CCharacter *pChr = pSelf->GetPlayerChar(ClientId);
+	if(pChr && pChr->Core()->m_MoveRestrictionExtra.m_VipPlus)
+		return true;
+	const int AccId = pSelf->Accounts()->FindByClientId(ClientId);
+	if(AccId < ACC_START)
+		return false;
+	const SAccountInfo *pAcc = pSelf->Accounts()->Get(AccId);
+	return pAcc && (pAcc->m_VIP == VIP_PLUS || pAcc->m_VIP == VIP_ADMIN);
+}
+
+void CGameContext::ConVipCosmetic(IConsole::IResult *pResult, void *pUserData)
+{
+	CGameContext *pSelf = (CGameContext *)pUserData;
+	const int ClientId = pResult->m_ClientId;
+	CCharacter *pChr = pSelf->GetPlayerChar(ClientId);
+	if(!pChr)
+		return;
+	if(!PlayerHasVipPlus(pSelf, ClientId))
+	{
+		pSelf->SendChatTarget(ClientId, "VIP+ required for cosmetics");
+		return;
+	}
+
+	const char *pWhich = pResult->GetString(0);
+	if(str_comp_nocase(pWhich, "lovely") == 0)
+	{
+		pChr->m_Lovely = !pChr->m_Lovely;
+		if(pChr->m_Lovely)
+			new CLovely(&pSelf->m_World, pChr->GetPos(), ClientId);
+		pSelf->SendChatTarget(ClientId, pChr->m_Lovely ? "lovely on" : "lovely off");
+	}
+	else if(str_comp_nocase(pWhich, "trail") == 0)
+	{
+		pChr->m_Trail = !pChr->m_Trail;
+		if(pChr->m_Trail)
+			new CTrail(&pSelf->m_World, pChr->GetPos(), ClientId);
+		pSelf->SendChatTarget(ClientId, pChr->m_Trail ? "trail on" : "trail off");
+	}
+	else if(str_comp_nocase(pWhich, "atom") == 0)
+	{
+		pChr->m_Atom = !pChr->m_Atom;
+		if(pChr->m_Atom)
+			new CAtom(&pSelf->m_World, pChr->GetPos(), ClientId);
+		pSelf->SendChatTarget(ClientId, pChr->m_Atom ? "atom on" : "atom off");
+	}
+	else if(str_comp_nocase(pWhich, "ball") == 0 || str_comp_nocase(pWhich, "rotating_ball") == 0)
+	{
+		pChr->m_RotatingBall = !pChr->m_RotatingBall;
+		if(pChr->m_RotatingBall)
+			new CRotatingBall(&pSelf->m_World, pChr->GetPos(), ClientId);
+		pSelf->SendChatTarget(ClientId, pChr->m_RotatingBall ? "rotating_ball on" : "rotating_ball off");
+	}
+	else if(str_comp_nocase(pWhich, "epic") == 0 || str_comp_nocase(pWhich, "epic_circle") == 0)
+	{
+		pChr->m_EpicCircle = !pChr->m_EpicCircle;
+		if(pChr->m_EpicCircle)
+			new CEpicCircle(&pSelf->m_World, pChr->GetPos(), ClientId);
+		pSelf->SendChatTarget(ClientId, pChr->m_EpicCircle ? "epic_circle on" : "epic_circle off");
+	}
+	else
+	{
+		pSelf->SendChatTarget(ClientId, "Usage: /vipcosmetic <lovely|trail|atom|ball|epic>");
+	}
+}
+
+void CGameContext::ConBuyRoomKey(IConsole::IResult *pResult, void *pUserData)
+{
+	CGameContext *pSelf = (CGameContext *)pUserData;
+	pSelf->Accounts()->BuyRoomKey(pResult->m_ClientId);
+}
+
+void CGameContext::ConMoney(IConsole::IResult *pResult, void *pUserData)
+{
+	CGameContext *pSelf = (CGameContext *)pUserData;
+	const int ClientId = pResult->m_ClientId;
+	CPlayer *pPlayer = pSelf->m_apPlayers[ClientId];
+	if(!pPlayer)
+		return;
+
+	char aBuf[160];
+	const int AccId = pSelf->Accounts()->FindByClientId(ClientId);
+	if(AccId >= ACC_START)
+	{
+		const SAccountInfo *pAcc = pSelf->Accounts()->Get(AccId);
+		str_format(aBuf, sizeof(aBuf), "Money: %lld (account '%s')",
+			(long long)pPlayer->GetWalletMoney(), pAcc ? pAcc->m_aUsername : "?");
+	}
+	else
+		str_format(aBuf, sizeof(aBuf), "Money: %lld (not logged in)", (long long)pPlayer->GetWalletMoney());
+	pSelf->SendChatTarget(ClientId, aBuf);
+}
+
+void CGameContext::ConDiscord(IConsole::IResult *pResult, void *pUserData)
+{
+	CGameContext *pSelf = (CGameContext *)pUserData;
+	const int ClientId = pResult->m_ClientId;
+	if(!pSelf->m_apPlayers[ClientId])
+		return;
+	if(g_Config.m_SvDiscordURL[0])
+	{
+		char aBuf[192];
+		str_format(aBuf, sizeof(aBuf), "Discord server: %s", g_Config.m_SvDiscordURL);
+		pSelf->SendChatTarget(ClientId, aBuf);
+	}
+	else
+		pSelf->SendChatTarget(ClientId, "This server does not have a linked Discord server");
+}
+
+void CGameContext::ConAccountInfo(IConsole::IResult *pResult, void *pUserData)
+{
+	CGameContext *pSelf = (CGameContext *)pUserData;
+	const int ClientId = pResult->m_ClientId;
+	const int AccId = pSelf->Accounts()->FindByClientId(ClientId);
+	if(AccId < ACC_START)
+	{
+		pSelf->SendChatTarget(ClientId, "Not logged in. Use /login");
+		return;
+	}
+	const SAccountInfo *pAcc = pSelf->Accounts()->Get(AccId);
+	CPlayer *pPlayer = pSelf->m_apPlayers[ClientId];
+	if(!pAcc || !pPlayer)
+		return;
+
+	char aBuf[256];
+	const char *pVip = pAcc->m_VIP == VIP_ADMIN ? "ADMIN" : pAcc->m_VIP == VIP_PLUS ? "VIP+" : pAcc->m_VIP == VIP_CLASSIC ? "VIP" : "none";
+	str_format(aBuf, sizeof(aBuf),
+		"Account '%s' | lvl %d | vip %s | money %lld | police %d | taser %d | portal bat %d | roomkey %s",
+		pAcc->m_aUsername, pAcc->m_Level, pVip,
+		(long long)pPlayer->GetWalletMoney(),
+		pAcc->m_PoliceLevel, pAcc->m_TaserLevel, pAcc->m_PortalBattery,
+		pPlayer->m_HasRoomKey ? "yes" : "no");
+	pSelf->SendChatTarget(ClientId, aBuf);
+}
+
+void CGameContext::ConAccSet(IConsole::IResult *pResult, void *pUserData)
+{
+	CGameContext *pSelf = (CGameContext *)pUserData;
+	const int ClientId = pResult->GetVictim(0);
+	const int AccId = pSelf->Accounts()->FindByClientId(ClientId);
+	SAccountInfo *pAcc = pSelf->Accounts()->Get(AccId);
+	if(!pAcc || AccId < ACC_START)
+	{
+		pSelf->Console()->Print(IConsole::OUTPUT_LEVEL_STANDARD, "account", "Player not logged in");
+		return;
+	}
+
+	const char *pField = pResult->GetString(1);
+	const int Value = pResult->GetInteger(2);
+	if(str_comp_nocase(pField, "portal_battery") == 0)
+		pAcc->m_PortalBattery = std::max(0, Value);
+	else if(str_comp_nocase(pField, "portal_blocker") == 0)
+		pAcc->m_PortalBlocker = std::max(0, Value);
+	else if(str_comp_nocase(pField, "portal_rifle") == 0)
+		pAcc->m_PortalRifle = Value != 0 ? 1 : 0;
+	else if(str_comp_nocase(pField, "taser_level") == 0)
+		pAcc->m_TaserLevel = std::clamp(Value, 0, 10);
+	else if(str_comp_nocase(pField, "taser_battery") == 0)
+		pAcc->m_TaserBattery = std::max(0, Value);
+	else if(str_comp_nocase(pField, "police") == 0)
+		pAcc->m_PoliceLevel = std::max(0, Value);
+	else if(str_comp_nocase(pField, "level") == 0)
+		pAcc->m_Level = std::max(1, Value);
+	else if(str_comp_nocase(pField, "spawn_shotgun") == 0)
+		pAcc->m_aSpawnWeapon[0] = Value != 0 ? 1 : 0;
+	else if(str_comp_nocase(pField, "spawn_grenade") == 0)
+		pAcc->m_aSpawnWeapon[1] = Value != 0 ? 1 : 0;
+	else if(str_comp_nocase(pField, "spawn_laser") == 0)
+		pAcc->m_aSpawnWeapon[2] = Value != 0 ? 1 : 0;
+	else if(str_comp_nocase(pField, "ninjajetpack") == 0)
+		pAcc->m_Ninjajetpack = Value != 0;
+	else
+	{
+		pSelf->Console()->Print(IConsole::OUTPUT_LEVEL_STANDARD, "account",
+			"fields: portal_battery|portal_blocker|portal_rifle|taser_level|taser_battery|police|level|spawn_shotgun|spawn_grenade|spawn_laser|ninjajetpack");
+		return;
+	}
+
+	pSelf->Accounts()->Persist(AccId);
+	if(CPlayer *pPlayer = pSelf->m_apPlayers[ClientId])
+		pSelf->Accounts()->ApplyAccountLoadouts(pPlayer);
+	pSelf->Console()->Print(IConsole::OUTPUT_LEVEL_STANDARD, "account", "Updated");
 }
 
 void CGameContext::RegisterFddraceAccountCommands()
@@ -689,6 +1116,23 @@ void CGameContext::RegisterFddraceAccountCommands()
 	Console()->Register("give_grog", "v[id]", CFGFLAG_SERVER, ConGiveGrog, this, "Give grog to player");
 	Console()->Register("grog_sip", "v[id]", CFGFLAG_SERVER, ConGrogSip, this, "Take a sip from held grog");
 	Console()->Register("grog_drop", "v[id]", CFGFLAG_SERVER, ConGrogDrop, this, "Drop held grog");
+	Console()->Register("save_drop", "v[id] ?f[hours] ?r[reason]", CFGFLAG_SERVER, ConSaveDrop, this, "Save player tee then kick");
+	Console()->Register("list_saved_tees", "", CFGFLAG_SERVER, ConListSavedTees, this, "List saved tee identities for current map");
+	Console()->Register("wallet_add", "v[id] i[amount]", CFGFLAG_SERVER, ConWalletAdd, this, "Add/subtract money from player wallet");
+	Console()->Register("spawn_button", "v[id] ?i[number]", CFGFLAG_SERVER, ConSpawnButton, this, "Spawn plot-draw button at player");
+	Console()->Register("spawn_helicopter", "v[id]", CFGFLAG_SERVER, ConSpawnHelicopter, this, "Spawn slim helicopter near player");
+	Console()->Register("forceflagowner", "i[flag] ?i[id]", CFGFLAG_SERVER, ConForceFlagOwner, this, "Give flag to player (0=red,1=blue; id=-1 to return)");
+	Console()->Register("spawn_speedup", "v[id] ?i[angle] ?i[force] ?i[maxspeed]", CFGFLAG_SERVER, ConSpawnSpeedup, this, "Spawn speedup tile entity at player");
+	Console()->Register("redirect_client_safe", "v[id] i[port]", CFGFLAG_SERVER, ConRedirectClientSafe, this, "Force safe redirect (save tee + redirect)");
+	Console()->Register("draw_tool", "v[id] ?s[off|speedup|button|heli|tele]", CFGFLAG_SERVER, ConDrawTool, this, "Slim draw tool: fire places speedup/button/heli/tele");
+	Console()->Register("roominvite", "s[player]", CFGFLAG_CHAT | CFGFLAG_SERVER, ConRoomInvite, this, "Invite player into room (requires room key)");
+	Console()->Register("roomkick", "s[player]", CFGFLAG_CHAT | CFGFLAG_SERVER, ConRoomKick, this, "Kick invited player from room (requires room key)");
+	Console()->Register("vipcosmetic", "s[which]", CFGFLAG_CHAT | CFGFLAG_SERVER, ConVipCosmetic, this, "Toggle VIP+ cosmetic: lovely/trail/atom/ball/epic");
+	Console()->Register("buyroomkey", "", CFGFLAG_CHAT | CFGFLAG_SERVER, ConBuyRoomKey, this, "Buy a session room key for sv_room_key_price");
+	Console()->Register("money", "", CFGFLAG_CHAT | CFGFLAG_SERVER, ConMoney, this, "Show wallet money");
+	Console()->Register("discord", "", CFGFLAG_CHAT | CFGFLAG_SERVER, ConDiscord, this, "Show Discord server URL");
+	Console()->Register("account", "", CFGFLAG_CHAT | CFGFLAG_SERVER, ConAccountInfo, this, "Show account summary");
+	Console()->Register("acc_set", "v[id] s[field] i[value]", CFGFLAG_SERVER, ConAccSet, this, "Set account field (portal_battery, taser_level, spawn_*, …)");
 }
 
 #endif

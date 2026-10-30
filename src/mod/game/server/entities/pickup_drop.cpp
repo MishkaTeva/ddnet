@@ -9,6 +9,7 @@
 #include <game/server/entities/character.h>
 #include <game/server/gamecontext.h>
 #include <game/server/player.h>
+#include <game/weapons_ex.h>
 
 CPickupDrop::CPickupDrop(CGameWorld *pGameWorld, vec2 Pos, int Type, int Owner, float Direction, int Lifetime, int Weapon) :
 	CEntity(pGameWorld, CGameWorld::ENTTYPE_PICKUP_DROP, true, Pos, PHYS_SIZE)
@@ -81,7 +82,7 @@ int CPickupDrop::IsCharacterNear()
 
 		if(m_Type == POWERUP_WEAPON)
 		{
-			if(m_Weapon < 0 || m_Weapon >= NUM_WEAPONS)
+			if(m_Weapon < 0 || m_Weapon >= NUM_FDDRACE_WEAPONS)
 				continue;
 			if(pChr->GetWeaponGot(m_Weapon))
 				continue;
@@ -145,6 +146,8 @@ void CPickupDrop::Snap(int SnappingClient)
 	const bool Sixup = Server()->IsSixup(SnappingClient);
 	CSnapContext Context(Version, Sixup, SnappingClient);
 
-	const int SubType = (m_Type == POWERUP_WEAPON) ? m_Weapon : 0;
+	int SubType = (m_Type == POWERUP_WEAPON) ? m_Weapon : 0;
+	if(SubType >= NUM_VANILLA_WEAPONS)
+		SubType = WEAPON_LASER;
 	GameServer()->SnapPickup(Context, GetId().value(), m_Pos, m_Type, SubType, 0, 0);
 }

@@ -18,7 +18,15 @@
 #include <engine/shared/protocol.h>
 
 #include <game/gamecore.h>
+#include <game/mapitems.h>
 #include <game/teamscore.h>
+
+#ifdef CONF_FDDRACE_MOD
+#include <mod/game/server/minigames/arenas.h>
+#include <mod/game/server/minigames/durak.h>
+#include <mod/game/server/minigames/fng.h>
+#include <mod/game/server/minigames/minigame.h>
+#endif
 
 #include <algorithm>
 
@@ -97,6 +105,13 @@ void CPlayer::Reset()
 	m_BanPlungerToilet = false;
 	m_apPortal[0] = nullptr;
 	m_apPortal[1] = nullptr;
+	m_Minigame = MINIGAME_NONE;
+	m_RequestedMinigame = MINIGAME_NONE;
+	m_LastMinigameRequest = 0;
+	m_LastMovementTick = 0;
+	m_SavedMinigameTee = false;
+	for(int i = 0; i < MAX_CLIENTS; i++)
+		m_HidePlayerTeam[i] = TEAM_RED;
 #endif
 
 	m_SendVoteIndex = -1;
@@ -219,8 +234,7 @@ void CPlayer::Tick()
 		if(m_JailTime == 1)
 		{
 			GameServer()->SendChatTarget(m_ClientId, "You have been released from jail");
-			m_JailTime = 0;
-			KillCharacter(WEAPON_GAME);
+			GameServer()->Accounts()->ReleaseJail(m_ClientId);
 		}
 		else if(Server()->Tick() % Server()->TickSpeed() == 0)
 		{
@@ -229,6 +243,10 @@ void CPlayer::Tick()
 			GameServer()->SendBroadcast(aBuf, m_ClientId);
 		}
 	}
+
+	// Check VIP / portal rifle expiry about once per minute.
+	if(Server()->Tick() % (Server()->TickSpeed() * 60) == 0)
+		GameServer()->Accounts()->ExpireTimedItems(m_ClientId);
 #endif
 
 	if(m_ChatScore > 0)
@@ -394,11 +412,20 @@ void CPlayer::Snap(int SnappingClient)
 		PlayerInfo.m_Score = Score;
 		PlayerInfo.m_Local = (int)(m_ClientId == SnappingClient && (m_Paused != PAUSE_PAUSED || SnappingClientVersion >= VERSION_DDNET_OLD));
 		PlayerInfo.m_ClientId = TranslatedId;
+#ifdef CONF_FDDRACE_MOD
+		PlayerInfo.m_Team = (SnappingClient >= 0 && SnappingClient < MAX_CLIENTS) ? GetHidePlayerTeam(SnappingClient) : m_Team;
+#else
 		PlayerInfo.m_Team = m_Team;
+#endif
 		if(SnappingClientVersion < VERSION_DDNET_INDEPENDENT_SPECTATORS_TEAM)
 		{
 			// In older versions the SPECTATORS TEAM was also used if the own player is in PAUSE_PAUSED or if any player is in PAUSE_SPEC.
+#ifdef CONF_FDDRACE_MOD
+			int HideTeam = (SnappingClient >= 0 && SnappingClient < MAX_CLIENTS) ? GetHidePlayerTeam(SnappingClient) : m_Team;
+			PlayerInfo.m_Team = (m_Paused != PAUSE_PAUSED || m_ClientId != SnappingClient) && m_Paused < PAUSE_SPEC ? HideTeam : TEAM_SPECTATORS;
+#else
 			PlayerInfo.m_Team = (m_Paused != PAUSE_PAUSED || m_ClientId != SnappingClient) && m_Paused < PAUSE_SPEC ? m_Team : TEAM_SPECTATORS;
+#endif
 		}
 		Server()->SnapNewItem(TranslatedId, PlayerInfo);
 	}
@@ -627,7 +654,11 @@ void CPlayer::SendConnect(int FakeId, int ClientId)
 	protocol7::CNetMsg_Sv_ClientInfo NewClientInfoMsg;
 	NewClientInfoMsg.m_ClientId = FakeId;
 	NewClientInfoMsg.m_Local = ClientId == m_ClientId;
+#ifdef CONF_FDDRACE_MOD
+	NewClientInfoMsg.m_Team = pPlayer->GetHidePlayerTeam(m_ClientId);
+#else
 	NewClientInfoMsg.m_Team = pPlayer->GetTeam();
+#endif
 	NewClientInfoMsg.m_pName = Server()->ClientName(ClientId);
 	NewClientInfoMsg.m_pClan = Server()->ClientClan(ClientId);
 	NewClientInfoMsg.m_Country = Server()->ClientCountry(ClientId);
@@ -659,6 +690,12 @@ void CPlayer::SendDisconnect(int FakeId)
 void CPlayer::OnDisconnect()
 {
 #ifdef CONF_FDDRACE_MOD
+	// Drop periodic leftovers on normal leave so reconnect does not restore a stale tee.
+	// Keep jail saves. Skip during reload/shutdown (OnShutdown already wrote fresh saves).
+	if(!GameServer()->m_FddraceSave.KeepSavedTeesOnDisconnect())
+		GameServer()->m_FddraceSave.RemoveNonJailSaves(m_ClientId);
+	if(m_JailTime > 0 && GetCharacter())
+		GameServer()->m_FddraceSave.SaveCharacter(m_ClientId, SAVE_JAIL, g_Config.m_SvJailSaveTeeExpire);
 	GameServer()->Accounts()->LogoutClient(m_ClientId, true);
 #endif
 	KillCharacter();
@@ -851,15 +888,55 @@ bool CPlayer::SetTimerType(int TimerType)
 void CPlayer::TryRespawn()
 {
 	vec2 SpawnPos;
+	bool GotSpawn = false;
 
-	if(!GameServer()->m_pController->CanSpawn(m_Team, &SpawnPos, m_ClientId))
-		return;
+#ifdef CONF_FDDRACE_MOD
+	if(m_JailTime == 1)
+	{
+		m_JailTime = 0;
+		SpawnPos = GameServer()->Collision()->GetRandomModTile(TILE_JAIL_RELEASE);
+		if(SpawnPos.x < 0)
+			SpawnPos = GameServer()->Collision()->GetRandomModTile(TILE_JAIL);
+		GotSpawn = SpawnPos.x >= 0;
+	}
+	else if(m_JailTime > 0)
+	{
+		SpawnPos = GameServer()->Collision()->GetRandomModTile(TILE_JAIL);
+		GotSpawn = SpawnPos.x >= 0;
+		if(!GotSpawn)
+			dbg_msg("jail", "no TILE_JAIL on map — falling back to normal spawn for cid=%d", m_ClientId);
+	}
+#endif
+
+	if(!GotSpawn)
+	{
+		if(!GameServer()->m_pController->CanSpawn(m_Team, &SpawnPos, m_ClientId))
+			return;
+	}
 
 	m_WeakHookSpawn = false;
 	m_Spawning = false;
 	m_pCharacter = new(m_ClientId) CCharacter(&GameServer()->m_World, GameServer()->GetLastPlayerInput(m_ClientId));
 	m_ViewPos = SpawnPos;
 	m_pCharacter->Spawn(this, SpawnPos);
+
+#ifdef CONF_FDDRACE_MOD
+	if(!m_CheckedSavePlayer)
+	{
+		m_CheckedSavePlayer = true;
+		if(GameServer()->CheckLoadPlayer(m_ClientId, true))
+		{
+			if(!GetCharacter())
+			{
+				m_Spawning = true;
+				return;
+			}
+			SpawnPos = m_pCharacter->GetPos();
+			m_ViewPos = SpawnPos;
+		}
+	}
+#endif
+
 	GameServer()->CreatePlayerSpawn(SpawnPos, GameServer()->m_pController->GetMaskForPlayerWorldEvent(m_ClientId));
 
 	if(g_Config.m_SvTeam == SV_TEAM_FORCED_SOLO)
@@ -1193,8 +1270,242 @@ void CPlayer::CCameraInfo::Reset()
 }
 
 #ifdef CONF_FDDRACE_MOD
+#include <mod/game/server/account.h>
+
 int CPlayer::GetAccID() const
 {
 	return GameServer()->Accounts()->FindByClientId(m_ClientId);
+}
+
+bool CPlayer::GivePortalBattery(int Amount)
+{
+	const int AccId = GetAccID();
+	SAccountInfo *pAcc = GameServer()->Accounts()->Get(AccId);
+	if(!pAcc || AccId < ACC_START || !pAcc->m_LoggedIn)
+		return false;
+	const int Next = pAcc->m_PortalBattery + Amount;
+	if(Next < 0)
+		return false;
+	pAcc->m_PortalBattery = Next;
+	GameServer()->Accounts()->Persist(AccId);
+	return true;
+}
+
+bool CPlayer::GiveTaserBattery(int Amount)
+{
+	const int AccId = GetAccID();
+	SAccountInfo *pAcc = GameServer()->Accounts()->Get(AccId);
+	if(!pAcc || AccId < ACC_START || !pAcc->m_LoggedIn)
+		return false;
+	if(pAcc->m_TaserBattery >= MAX_TASER_BATTERY && Amount > 0)
+		return false;
+	const int Next = std::clamp(pAcc->m_TaserBattery + Amount, 0, (int)MAX_TASER_BATTERY);
+	pAcc->m_TaserBattery = Next;
+	GameServer()->Accounts()->Persist(AccId);
+	return true;
+}
+
+int CPlayer::GetPortalBattery() const
+{
+	const int AccId = GetAccID();
+	const SAccountInfo *pAcc = GameServer()->Accounts()->Get(AccId);
+	if(!pAcc || AccId < ACC_START || !pAcc->m_LoggedIn)
+		return 0;
+	return pAcc->m_PortalBattery;
+}
+
+void CPlayer::WalletTransaction(int64_t Amount)
+{
+	if(g_Config.m_SvMoneyBankMode == 0 && GetAccID() >= ACC_START)
+	{
+		BankTransaction(Amount);
+		return;
+	}
+	if(Amount == 0)
+		return;
+	SetWalletMoney(m_WalletMoney + Amount);
+}
+
+bool CPlayer::BankTransaction(int64_t Amount)
+{
+	const int AccId = GetAccID();
+	SAccountInfo *pAcc = GameServer()->Accounts()->Get(AccId);
+	if(!pAcc || AccId < ACC_START || Amount == 0)
+		return false;
+	pAcc->m_Money += Amount;
+	if(pAcc->m_Money < 0)
+		pAcc->m_Money = 0;
+	GameServer()->Accounts()->Persist(AccId);
+	return true;
+}
+
+int64_t CPlayer::GetUsableMoney() const
+{
+	if(g_Config.m_SvMoneyBankMode == 0 && GetAccID() >= ACC_START)
+	{
+		const SAccountInfo *pAcc = GameServer()->Accounts()->Get(GetAccID());
+		return pAcc ? pAcc->m_Money : 0;
+	}
+	return GetWalletMoney();
+}
+
+void CPlayer::ClearPlot()
+{
+	const int PlotId = GameServer()->GetPlotID(GetAccID());
+	if(PlotId < CGameContext::PLOT_START)
+	{
+		GameServer()->SendChatTarget(m_ClientId, "You need a plot to use this command");
+		return;
+	}
+	GameServer()->ClearPlotObjects(PlotId);
+	GameServer()->SendChatTarget(m_ClientId, "All objects of your plot have been removed");
+}
+
+void CPlayer::StartPlotEdit()
+{
+	CCharacter *pChr = GetCharacter();
+	const int PlotId = GameServer()->GetPlotID(GetAccID());
+	if(PlotId < CGameContext::PLOT_START)
+	{
+		GameServer()->SendChatTarget(m_ClientId, "You need a plot to use this command");
+		return;
+	}
+	if(!pChr)
+	{
+		GameServer()->SendChatTarget(m_ClientId, "You have to be alive to edit your plot");
+		return;
+	}
+	if(GameServer()->GetTilePlotID(pChr->GetPos()) != PlotId)
+	{
+		GameServer()->SendChatTarget(m_ClientId, "You have to be inside your plot to edit your plot");
+		return;
+	}
+
+	GameServer()->SendChatTarget(m_ClientId, "You are now editing your plot, switch to another weapon to exit the editor");
+	pChr->GiveWeapon(WEAPON_DRAW_EDITOR, false);
+	pChr->SetWeapon(WEAPON_DRAW_EDITOR);
+	pChr->m_DrawEditor.SetCategory(CDrawEditor::CAT_PICKUPS);
+	pChr->Core()->m_Vel = vec2(0, 0);
+}
+
+void CPlayer::SetPlaying(bool DoChatMsg)
+{
+	(void)DoChatMsg;
+	Pause(PAUSE_NONE, true);
+	SetTeam(TEAM_GAME, false);
+	if(m_pCharacter && m_pCharacter->IsPaused())
+		m_pCharacter->Pause(false);
+}
+
+void CPlayer::SaveMinigameTee()
+{
+	// TODO: full tee save/restore for leave-minigame (needs F-DDrace SaveTee minigame fields)
+	if(m_SavedMinigameTee || !m_pCharacter)
+		return;
+	m_MinigameTee.Save(m_pCharacter);
+	m_SavedMinigameTee = true;
+}
+
+bool CPlayer::LoadMinigameTee()
+{
+	if(!CanLoadMinigameTee() || !m_pCharacter)
+		return false;
+	m_MinigameTee.Load(m_pCharacter, 0);
+	m_pCharacter->Core()->m_Vel.y = -2.f;
+	m_pCharacter->Freeze(3);
+	m_SavedMinigameTee = false;
+	return true;
+}
+
+bool CPlayer::CanLoadMinigameTee() const
+{
+	// Saved on join from MINIGAME_NONE; restore only when back in none.
+	return m_SavedMinigameTee && m_Minigame == MINIGAME_NONE;
+}
+
+int CPlayer::GetHidePlayerTeam(int Asker)
+{
+	CPlayer *pAsker = GameServer()->m_apPlayers[Asker];
+	if(!pAsker)
+		return m_Team;
+
+	if(m_Team == TEAM_SPECTATORS)
+		return TEAM_SPECTATORS;
+
+	const bool AskerFng = pAsker->m_Minigame == MINIGAME_INSTAGIB_FNG || pAsker->m_Minigame == MINIGAME_INSTAGIB_BOOMFNG;
+	const bool SelfFng = m_Minigame == MINIGAME_INSTAGIB_FNG || m_Minigame == MINIGAME_INSTAGIB_BOOMFNG;
+
+	int AskerRoom = -1;
+	bool AskerTeamMode = false;
+	if(AskerFng)
+	{
+		CFng *pAskerFng = (CFng *)GameServer()->m_pMinigames[pAsker->m_Minigame];
+		int ViewId = Asker;
+		if((pAsker->GetTeam() == TEAM_SPECTATORS || pAsker->IsPaused()) && pAsker->SpectatorId() >= 0)
+			ViewId = pAsker->SpectatorId();
+		AskerRoom = pAskerFng->GetClientRoom(ViewId);
+		AskerTeamMode = pAskerFng->IsTeamMode(ViewId);
+	}
+
+	bool InFngRoom = false;
+	if(SelfFng)
+	{
+		CFng *pFng = (CFng *)GameServer()->m_pMinigames[m_Minigame];
+		InFngRoom = pFng->GetClientRoom(m_ClientId) >= 0;
+		if(AskerFng && AskerTeamMode && AskerRoom >= 0 && pFng->GetClientRoom(m_ClientId) == AskerRoom && pFng->IsTeamMode(m_ClientId))
+		{
+			int Side = pFng->GetSide(m_ClientId);
+			if(Side == FNG_SIDE_RED)
+				return TEAM_RED;
+			if(Side == FNG_SIDE_BLUE)
+				return TEAM_BLUE;
+			return TEAM_SPECTATORS;
+		}
+		if(AskerFng && AskerTeamMode && AskerRoom >= 0 && InFngRoom && pFng->GetClientRoom(m_ClientId) != AskerRoom)
+			return TEAM_SPECTATORS;
+	}
+
+	if(AskerFng && AskerTeamMode && AskerRoom >= 0)
+		return TEAM_SPECTATORS;
+
+	const bool HideAsOtherMinigame = g_Config.m_SvHideMinigamePlayers
+		&& !GameServer()->Durak()->InDurakGame(m_ClientId)
+		&& !GameServer()->Arenas()->FightStarted(m_ClientId)
+		&& !InFngRoom
+		&& pAsker->m_Minigame != m_Minigame;
+
+	if(m_Team != TEAM_SPECTATORS && HideAsOtherMinigame)
+		return TEAM_BLUE;
+	return m_Team;
+}
+
+bool CPlayer::RequestMinigameChange(int RequestedMinigame)
+{
+	if(m_LastMinigameRequest && m_LastMinigameRequest > Server()->Tick() - Server()->TickSpeed() * 5)
+		return true;
+
+	if(RequestedMinigame == m_RequestedMinigame)
+		return false;
+
+	if(m_JailTime)
+	{
+		GameServer()->SendChatTarget(m_ClientId, Localize("You can't join a minigame while being arrested"));
+		return true;
+	}
+
+	if(!GetCharacter())
+		return false;
+
+	if(GetCharacter()->m_FreezeTime)
+	{
+		GameServer()->SendChatTarget(m_ClientId, Localize("You can't join a minigame while being frozen"));
+	}
+	else
+	{
+		m_RequestedMinigame = RequestedMinigame;
+		m_LastMinigameRequest = Server()->Tick();
+		GameServer()->SendChatTarget(m_ClientId, Localize("Minigame request sent, please don't move for 5 seconds"));
+	}
+	return true;
 }
 #endif
