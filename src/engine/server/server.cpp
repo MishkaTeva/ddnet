@@ -2133,10 +2133,7 @@ void CServer::OnNetMsgClientVer(int ClientId, CUuid *pConnectionId, int DDNetVer
 	str_copy(m_aClients[ClientId].m_aDDNetVersionStr, pDDNetVersionStr);
 	m_aClients[ClientId].m_DDNetVersionSettled = true;
 	m_aClients[ClientId].m_GotDDNetVersionPacket = true;
-	if(!m_aClients[ClientId].m_Rejoining)
-	{
-		m_aClients[ClientId].m_State = CClient::STATE_AUTH;
-	}
+	m_aClients[ClientId].m_State = CClient::STATE_AUTH;
 #ifdef CONF_FDDRACE_MOD
 	m_aClients[ClientId].m_Main = true;
 	const int DummyPair = GetDummy(ClientId);
