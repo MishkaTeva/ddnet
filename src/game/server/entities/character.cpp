@@ -931,8 +931,18 @@ void CCharacter::OnPredictedInput(const CNetObj_PlayerInput *pNewInput)
 	if(mem_comp(&m_SavedInput, pNewInput, sizeof(CNetObj_PlayerInput)) != 0)
 		m_LastAction = Server()->Tick();
 
+	const int PrevTargetX = m_Input.m_TargetX;
+	const int PrevTargetY = m_Input.m_TargetY;
+
 	// copy new input
 	mem_copy(&m_Input, pNewInput, sizeof(m_Input));
+
+	// reset target due to spectator mode input not being in aim space
+	if(pNewInput->m_PlayerFlags & PLAYERFLAG_SPEC_CAM)
+	{
+		m_Input.m_TargetX = PrevTargetX;
+		m_Input.m_TargetY = PrevTargetY;
+	}
 
 	// it is not allowed to aim in the center
 	if(m_Input.m_TargetX == 0 && m_Input.m_TargetY == 0)
@@ -946,6 +956,13 @@ void CCharacter::OnDirectInput(const CNetObj_PlayerInput *pNewInput)
 	mem_copy(&m_LatestPrevInput, &m_LatestInput, sizeof(m_LatestInput));
 	mem_copy(&m_LatestInput, pNewInput, sizeof(m_LatestInput));
 	m_NumInputs++;
+
+	// reset target due to spectator mode input not being in aim space
+	if(pNewInput->m_PlayerFlags & PLAYERFLAG_SPEC_CAM)
+	{
+		m_LatestInput.m_TargetX = m_LatestPrevInput.m_TargetX;
+		m_LatestInput.m_TargetY = m_LatestPrevInput.m_TargetY;
+	}
 
 	// it is not allowed to aim in the center
 	if(m_LatestInput.m_TargetX == 0 && m_LatestInput.m_TargetY == 0)
@@ -1272,8 +1289,8 @@ void CCharacter::Die(int Killer, int Weapon, bool SendKillMsg)
 		((CFng *)GameServer()->m_pMinigames[m_pPlayer->m_Minigame])->OnPlayerDie(m_pPlayer->GetCid(), KillerId, Weapon);
 	}
 #endif
-	if(Killer != WEAPON_GAME && m_SetSavePos[RESCUEMODE_AUTO])
-		GetPlayer()->m_LastDeath = m_RescueTee[RESCUEMODE_AUTO];
+	if(Killer != WEAPON_GAME && m_aSetSavePos[RESCUEMODE_AUTO])
+		GetPlayer()->m_LastDeath = m_aRescueTee[RESCUEMODE_AUTO];
 	StopRecording();
 	int ModeSpecial = GameServer()->m_pController->OnCharacterDeath(this, GameServer()->m_apPlayers[Killer], Weapon);
 
@@ -1910,17 +1927,15 @@ void CCharacter::SetTimeCheckpoint(int TimeCheckpoint)
 				if(Server()->IsSixup(m_pPlayer->GetCid()))
 				{
 					protocol7::CNetMsg_Sv_Checkpoint Msg;
-					float Diff = (m_aCurrentTimeCp[m_LastTimeCp] - pData->m_aBestTimeCp[m_LastTimeCp]) * 1000;
-					Msg.m_Diff = (int)Diff;
+					Msg.m_Diff = static_cast<int>(time_milliseconds_from_seconds(m_aCurrentTimeCp[m_LastTimeCp]) - time_milliseconds_from_seconds(pData->m_aBestTimeCp[m_LastTimeCp]));
 					Server()->SendPackMsg(&Msg, MSGFLAG_VITAL, m_pPlayer->GetCid());
 				}
 				else
 				{
 					CNetMsg_Sv_DDRaceTime Msg;
-					Msg.m_Time = (int)(m_Time * 100.0f);
+					Msg.m_Time = static_cast<int>(time_even_centiseconds_from_seconds(m_Time));
 					Msg.m_Finish = 0;
-					float Diff = (m_aCurrentTimeCp[m_LastTimeCp] - pData->m_aBestTimeCp[m_LastTimeCp]) * 100;
-					Msg.m_Check = (int)Diff;
+					Msg.m_Check = static_cast<int>(time_even_centiseconds_from_seconds(m_aCurrentTimeCp[m_LastTimeCp]) - time_even_centiseconds_from_seconds(pData->m_aBestTimeCp[m_LastTimeCp]));
 					Server()->SendPackMsg(&Msg, MSGFLAG_VITAL, m_pPlayer->GetCid());
 				}
 			}
@@ -2574,8 +2589,8 @@ bool CCharacter::TrySetRescue(int RescueMode)
 	bool Set = false;
 	if(g_Config.m_SvRescue || ((g_Config.m_SvTeam == SV_TEAM_FORCED_SOLO || Team() > TEAM_FLOCK) && Teams()->IsValidTeamNumber(Team())))
 	{
-		// check for nearby health pickups (also freeze)
-		bool InHealthPickup = false;
+		// check for nearby freeze pickups
+		bool InFreezePickup = false;
 		if(!m_Core.m_IsInFreeze)
 		{
 			CEntity *apEnts[9];
@@ -2583,19 +2598,19 @@ bool CCharacter::TrySetRescue(int RescueMode)
 			for(int i = 0; i < Num; ++i)
 			{
 				CPickup *pPickup = static_cast<CPickup *>(apEnts[i]);
-				if(pPickup->Type() == POWERUP_HEALTH)
+				if(pPickup->Type() == POWERUP_FREEZE)
 				{
-					// This uses a separate variable InHealthPickup instead of setting m_Core.m_IsInFreeze
+					// This uses a separate variable InFreezePickup instead of setting m_Core.m_IsInFreeze
 					// as the latter causes freezebars to flicker when standing in the freeze range of a
-					// health pickup. When the same code for client prediction is added, the freezebars
-					// still flicker, but only when standing at the edge of the health pickup's freeze range.
-					InHealthPickup = true;
+					// freeze pickup. When the same code for client prediction is added, the freezebars
+					// still flicker, but only when standing at the edge of the freeze pickup's freeze range.
+					InFreezePickup = true;
 					break;
 				}
 			}
 		}
 
-		if(!m_Core.m_IsInFreeze && IsGrounded() && !m_Core.m_DeepFrozen && !InHealthPickup)
+		if(!m_Core.m_IsInFreeze && IsGrounded() && !m_Core.m_DeepFrozen && !InFreezePickup)
 		{
 			ForceSetRescue(RescueMode);
 			Set = true;
@@ -2607,8 +2622,8 @@ bool CCharacter::TrySetRescue(int RescueMode)
 
 void CCharacter::ForceSetRescue(int RescueMode)
 {
-	m_RescueTee[RescueMode].Save(this);
-	m_SetSavePos[RescueMode] = true;
+	m_aRescueTee[RescueMode].Save(this);
+	m_aSetSavePos[RescueMode] = true;
 }
 
 void CCharacter::DDRaceTick()
@@ -2991,8 +3006,7 @@ void CCharacter::DDRaceInit()
 	m_Paused = false;
 	m_DDRaceState = ERaceState::NONE;
 	m_PrevPos = m_Pos;
-	for(bool &Set : m_SetSavePos)
-		Set = false;
+	std::fill(std::begin(m_aSetSavePos), std::end(m_aSetSavePos), false);
 	m_LastBroadcast = 0;
 	m_TeamBeforeSuper = 0;
 	m_Core.m_Id = GetPlayer()->GetCid();
@@ -3041,7 +3055,7 @@ void CCharacter::DDRaceInit()
 
 bool CCharacter::Rescue()
 {
-	if(m_SetSavePos[GetPlayer()->m_RescueMode] && !m_Core.m_Super && !m_Core.m_Invincible)
+	if(m_aSetSavePos[GetPlayer()->m_RescueMode] && !m_Core.m_Super && !m_Core.m_Invincible)
 	{
 		if(m_LastRescue + (int64_t)g_Config.m_SvRescueDelay * Server()->TickSpeed() > Server()->Tick() && !Teams()->IsPractice(Team()))
 		{
@@ -3054,7 +3068,7 @@ bool CCharacter::Rescue()
 		m_LastRescue = Server()->Tick();
 		int StartTime = m_StartTime;
 		ERaceState DDRaceState = m_DDRaceState;
-		m_RescueTee[GetPlayer()->m_RescueMode].Load(this);
+		m_aRescueTee[GetPlayer()->m_RescueMode].Load(this);
 		// Don't load these from saved tee:
 		m_Core.m_Vel = vec2(0, 0);
 		m_Core.m_HookState = HOOK_IDLE;
