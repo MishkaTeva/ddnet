@@ -19,6 +19,9 @@ class CPlayer;
 
 enum
 {
+	DIFFERENCE_XP_END = 100,
+	OVER_LVL_100_XP = 2000000,
+
 	ACC_START = 1,
 	VIP_NONE = 0,
 	VIP_CLASSIC = 1,
@@ -205,6 +208,7 @@ public:
 	void JailPlayer(int ClientId, int Seconds);
 	void ReleaseJail(int ClientId);
 	bool IsJailed(int ClientId) const;
+	int64_t GetNeededXP(int Level) const;
 };
 
 #endif

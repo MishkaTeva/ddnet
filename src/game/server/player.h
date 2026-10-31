@@ -351,9 +351,15 @@ public:
 	bool m_VoteQuestionRunning = false;
 	void StartVoteQuestion(int Type, int Seconds = 20) { (void)Seconds; m_VoteQuestionType = Type; m_VoteQuestionRunning = true; /* TODO */ }
 	void OnEndVoteQuestion(int Result = 0) { (void)Result; m_VoteQuestionRunning = false; m_VoteQuestionType = VOTE_QUESTION_NONE; }
-	int m_Gamemode = 0;
-	int m_SavedGamemode = 0;
-	void GiveXP(int Amount, const char *pReason = "") { (void)Amount; (void)pReason; /* TODO: XP system */ }
+	enum
+	{
+		GAMEMODE_DDRACE = 0,
+		GAMEMODE_VANILLA = 1,
+	};
+	int m_Gamemode = GAMEMODE_DDRACE;
+	int m_SavedGamemode = GAMEMODE_DDRACE;
+	void GiveXP(int64_t Amount, const char *pReason = "");
+	void GiveBlockPoints(int Amount, int Victim);
 #endif
 };
 

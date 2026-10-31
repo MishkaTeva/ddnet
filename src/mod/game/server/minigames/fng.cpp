@@ -5,6 +5,7 @@
 #include <game/server/gamecontroller.h>
 #include <game/server/entities/character.h>
 #include <game/server/player.h>
+#include <game/server/score.h>
 #include <engine/shared/config.h>
 #include <engine/shared/protocol.h>
 #include <generated/server_data.h>
@@ -256,8 +257,11 @@ void CFng::SendScoreToAll(int R)
 		CPlayer *p = GameServer()->m_apPlayers[i];
 		if(!p)
 			continue;
-		Server()->SetClientScore(i, std::nullopt); /* TODO: restore race score */
-		(void)p;
+		std::optional<float> BestTime = GameServer()->Score()->PlayerData(i)->m_BestTime;
+		if(BestTime.has_value())
+			Server()->SetClientScore(i, (int)BestTime.value());
+		else
+			Server()->SetClientScore(i, std::nullopt);
 	}
 }
 
@@ -1053,8 +1057,11 @@ void CFng::OnPlayerLeave(int ClientID, bool Disconnect)
 		TEAMS.SetForceCharacterTeam(ClientID, 0);
 		// Repair scores corrupted by older solo FNG packing (points*3600).
 		CPlayer *p = GameServer()->m_apPlayers[ClientID];
-		Server()->SetClientScore(ClientID, std::nullopt); /* TODO: restore race score */
-		(void)p;
+		std::optional<float> BestTime = GameServer()->Score()->PlayerData(ClientID)->m_BestTime;
+		if(BestTime.has_value())
+			Server()->SetClientScore(ClientID, (int)BestTime.value());
+		else
+			Server()->SetClientScore(ClientID, std::nullopt);
 	}
 	if(CountPlayers(R) == 0)
 	{
@@ -1303,13 +1310,13 @@ void CFng::DoSpike(int ClientID, int SpikeTile, int KillerID)
 	CCharacter *pKillerChr = GameServer()->GetPlayerChar(KillerID);
 	if(pKillerChr)
 	{
-		/* TODO: m_KillStreak++ */ (void)0;
-		/* TODO: PlayKillAnnouncer */
-		if(false /* TODO: killstreak */)
+		pKillerChr->m_KillStreak++;
+		GameServer()->PlayKillAnnouncer(KillerID, ClientID, WEAPON_NINJA, true);
+		if(pKillerChr->m_KillStreak % 5 == 0)
 		{
 			GameServer()->SendChatFormat(-1, TEAM_ALL, -1, CGameContext::CHATFLAG_ALL,
 				Localizable("%s is on a killing spree with %d kills"),
-				Server()->ClientName(KillerID), 0);
+				Server()->ClientName(KillerID), pKillerChr->m_KillStreak);
 			GameServer()->CreateFinishConfetti(pKillerChr->GetPos(), pKillerChr->TeamMask());
 		}
 	}

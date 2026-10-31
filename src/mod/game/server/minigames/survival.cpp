@@ -36,14 +36,14 @@ void CSurvival::OnPlayerJoin(int ClientID)
 {
 	m_aState[ClientID] = SURVIVAL_LOBBY;
 	CPlayer *pPlayer = GameServer()->m_apPlayers[ClientID];
-	pPlayer->m_Gamemode = pPlayer->m_SavedGamemode = 0 /* GAMEMODE_VANILLA TODO */;
+	pPlayer->m_Gamemode = pPlayer->m_SavedGamemode = CPlayer::GAMEMODE_VANILLA;
 }
 
 void CSurvival::OnPlayerLeave(int ClientID, bool Disconnect, bool Shutdown)
 {
 	m_aState[ClientID] = SURVIVAL_OFFLINE;
 	CPlayer *pPlayer = GameServer()->m_apPlayers[ClientID];
-	pPlayer->m_Gamemode = pPlayer->m_SavedGamemode = 1 /* GAMEMODE_DDRACE TODO */;
+	pPlayer->m_Gamemode = pPlayer->m_SavedGamemode = CPlayer::GAMEMODE_DDRACE;
 	pPlayer->m_ShowName = true;
 }
 

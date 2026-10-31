@@ -2645,7 +2645,9 @@ void CGameContext::OnSayNetMessage(const CNetMsg_Cl_Say *pMsg, int ClientId, con
 		*(const_cast<char *>(pEnd)) = 0;
 
 	// drop empty and autocreated spam messages (more than 32 characters per second)
-	if(Length == 0 || (pMsg->m_pMessage[0] != '/' && (g_Config.m_SvSpamprotection && pPlayer->m_LastChat && pPlayer->m_LastChat + Server()->TickSpeed() * ((31 + Length) / 32) > Server()->Tick())))
+	const bool IsWhisperCmd = (pMsg->m_pMessage[0] == '/' && (str_startswith_nocase(pMsg->m_pMessage + 1, "w ") || str_startswith_nocase(pMsg->m_pMessage + 1, "whisper ") || str_startswith_nocase(pMsg->m_pMessage + 1, "c ") || str_startswith_nocase(pMsg->m_pMessage + 1, "converse ")));
+	const bool IsRealCommand = (pMsg->m_pMessage[0] == '/' && !IsWhisperCmd);
+	if(Length == 0 || (!IsRealCommand && (g_Config.m_SvSpamprotection && pPlayer->m_LastChat && pPlayer->m_LastChat + Server()->TickSpeed() * ((31 + Length) / 32) > Server()->Tick())))
 		return;
 
 	int GameTeam = GetDDRaceTeam(pPlayer->GetCid());
@@ -2659,18 +2661,22 @@ void CGameContext::OnSayNetMessage(const CNetMsg_Cl_Say *pMsg, int ClientId, con
 		const char *pWhisper;
 		if((pWhisper = str_startswith_nocase(pMsg->m_pMessage + 1, "w ")))
 		{
+			pPlayer->m_LastChat = Server()->Tick();
 			Whisper(pPlayer->GetCid(), const_cast<char *>(pWhisper));
 		}
 		else if((pWhisper = str_startswith_nocase(pMsg->m_pMessage + 1, "whisper ")))
 		{
+			pPlayer->m_LastChat = Server()->Tick();
 			Whisper(pPlayer->GetCid(), const_cast<char *>(pWhisper));
 		}
 		else if((pWhisper = str_startswith_nocase(pMsg->m_pMessage + 1, "c ")))
 		{
+			pPlayer->m_LastChat = Server()->Tick();
 			Converse(pPlayer->GetCid(), const_cast<char *>(pWhisper));
 		}
 		else if((pWhisper = str_startswith_nocase(pMsg->m_pMessage + 1, "converse ")))
 		{
+			pPlayer->m_LastChat = Server()->Tick();
 			Converse(pPlayer->GetCid(), const_cast<char *>(pWhisper));
 		}
 		else
@@ -6770,5 +6776,164 @@ void CGameContext::HandleDiscordMessage(const char *pUsername, const char *pUser
 	char aBuf[512];
 	str_format(aBuf, sizeof(aBuf), "[Discord] @%s: %s", pUsername, pText);
 	SendChat(-1, TEAM_ALL, aBuf);
+}
+
+void CGameContext::ResetKillAnnouncer(int ClientId)
+{
+	(void)ClientId;
+	m_FirstBloodAnnounced = false;
+}
+
+void CGameContext::PlayMapSoundClients(int Sound, const int *pClients, int NumClients, int FallbackSound)
+{
+	(void)Sound;
+	if(!pClients || NumClients <= 0)
+		return;
+	const int S = FallbackSound >= 0 ? FallbackSound : SOUND_CTF_CAPTURE;
+	for(int i = 0; i < NumClients; i++)
+	{
+		const int Cid = pClients[i];
+		if(Cid >= 0 && Cid < MAX_CLIENTS && m_apPlayers[Cid])
+			CreateSoundGlobal(S, Cid);
+	}
+}
+
+void CGameContext::PlayKillAnnouncer(int KillerID, int VictimID, int Weapon, bool AllowKillConfirm)
+{
+	(void)Weapon;
+	if(KillerID < 0 || KillerID >= MAX_CLIENTS || !m_apPlayers[KillerID])
+		return;
+
+	CCharacter *pKiller = m_apPlayers[KillerID]->GetCharacter();
+	if(!pKiller)
+		return;
+
+	enum
+	{
+		SOUND_FIRST_BLOOD = 0,
+		SOUND_DOUBLE_KILL = 2,
+		SOUND_TRIPLE_KILL = 4,
+		SOUND_ULTRA_KILL = 5,
+		SOUND_RAMPAGE = 6,
+		SOUND_KILLING_SPREE = 7,
+		SOUND_DOMINATING = 8,
+		SOUND_MEGA_KILL = 9,
+		SOUND_UNSTOPPABLE = 10,
+		SOUND_WICKED_SICK = 11,
+		SOUND_MONSTER_KILL = 12,
+		SOUND_LUDICROUS_KILL = 13,
+		SOUND_HOLY_SHIT = 14,
+		SOUND_HEADSHOT = 18,
+	};
+
+	const int Minigame = m_apPlayers[KillerID]->m_Minigame;
+	const bool IsFng = Minigame == MINIGAME_INSTAGIB_FNG || Minigame == MINIGAME_INSTAGIB_BOOMFNG;
+	const bool IsArena = Minigame == MINIGAME_1VS1;
+
+	int MultiSeconds = 8;
+	if(IsFng)
+		MultiSeconds = 18;
+	else if(IsArena)
+		MultiSeconds = 12;
+
+	const int64_t Now = Server()->Tick();
+	const int64_t MultiKillWindow = (int64_t)Server()->TickSpeed() * MultiSeconds;
+	if(pKiller->m_LastKillTick > 0 && Now - pKiller->m_LastKillTick <= MultiKillWindow)
+		pKiller->m_MultiKillCount++;
+	else
+		pKiller->m_MultiKillCount = 1;
+	pKiller->m_LastKillTick = Now;
+
+	int Sound = -1;
+	if(!m_FirstBloodAnnounced)
+	{
+		m_FirstBloodAnnounced = true;
+		Sound = SOUND_FIRST_BLOOD + (rand() % 2);
+	}
+	else if(pKiller->m_MultiKillCount >= 2 && pKiller->m_MultiKillCount <= 5)
+	{
+		if(pKiller->m_MultiKillCount == 2)
+			Sound = SOUND_DOUBLE_KILL + (rand() % 2);
+		else if(pKiller->m_MultiKillCount == 3)
+			Sound = SOUND_TRIPLE_KILL;
+		else if(pKiller->m_MultiKillCount == 4)
+			Sound = SOUND_ULTRA_KILL;
+		else
+			Sound = SOUND_RAMPAGE;
+	}
+	else if(pKiller->m_MultiKillCount >= 6)
+	{
+		if(pKiller->m_MultiKillCount == 6)
+			Sound = SOUND_UNSTOPPABLE;
+		else if(pKiller->m_MultiKillCount == 7)
+			Sound = SOUND_WICKED_SICK;
+		else if(pKiller->m_MultiKillCount == 8)
+			Sound = SOUND_MONSTER_KILL;
+		else if(pKiller->m_MultiKillCount == 9)
+			Sound = SOUND_LUDICROUS_KILL;
+		else
+			Sound = SOUND_HOLY_SHIT;
+	}
+	else
+	{
+		switch(pKiller->m_KillStreak)
+		{
+		case 3: Sound = SOUND_KILLING_SPREE; break;
+		case 4: Sound = SOUND_DOMINATING; break;
+		case 5: Sound = SOUND_MEGA_KILL; break;
+		case 6: Sound = SOUND_UNSTOPPABLE; break;
+		case 7: Sound = SOUND_WICKED_SICK; break;
+		case 8: Sound = SOUND_MONSTER_KILL; break;
+		case 9: Sound = SOUND_LUDICROUS_KILL; break;
+		default:
+			if(pKiller->m_KillStreak >= 10)
+				Sound = SOUND_HOLY_SHIT;
+			break;
+		}
+	}
+
+	if(Sound < 0 && AllowKillConfirm)
+		Sound = SOUND_HEADSHOT + (rand() % 2);
+
+	if(Sound < 0)
+		return;
+
+	int aAudience[MAX_CLIENTS];
+	int NumAudience = 0;
+	auto AddAudience = [&](int ClientID)
+	{
+		if(ClientID < 0 || ClientID >= MAX_CLIENTS || !m_apPlayers[ClientID])
+			return;
+		for(int i = 0; i < NumAudience; i++)
+			if(aAudience[i] == ClientID)
+				return;
+		aAudience[NumAudience++] = ClientID;
+	};
+
+	AddAudience(KillerID);
+	AddAudience(VictimID);
+
+	if(IsFng)
+	{
+		CFng *pFng = (CFng *)m_pMinigames[Minigame];
+		if(pFng)
+		{
+			const int Room = pFng->GetClientRoom(KillerID);
+			if(Room >= 0)
+			{
+				for(int ClientID = 0; ClientID < MAX_CLIENTS; ClientID++)
+					if(pFng->GetClientRoom(ClientID) == Room)
+						AddAudience(ClientID);
+			}
+		}
+	}
+	else if(Minigame == MINIGAME_SURVIVAL)
+	{
+		for(int ClientID = 0; ClientID < MAX_CLIENTS; ClientID++)
+			if(m_apPlayers[ClientID] && m_apPlayers[ClientID]->m_Minigame == MINIGAME_SURVIVAL)
+				AddAudience(ClientID);
+	}
+
+	PlayMapSoundClients(Sound, aAudience, NumAudience, SOUND_CTF_CAPTURE);
 }
 #endif

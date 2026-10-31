@@ -29,6 +29,7 @@ void CAntiCheat::CClientData::Reset()
 	m_aPendingJailReason[0] = '\0';
 	m_ConnectTime = m_FirstMessageTime = m_LastCheckTime = 0;
 	m_SuspiciousScore = 0;
+	m_MsgWindowStart = m_MsgWindowCount = m_FloodStrikes = 0;
 }
 
 void CAntiCheat::Init(IServer *pServer, IStorage *pStorage)
@@ -472,17 +473,61 @@ bool CAntiCheat::ValidateClientWithData(int ClientID, int DDNetVersion, const ch
 	return true;
 }
 
-void CAntiCheat::OnClientMessage(int ClientID, int MsgID, bool System)
+bool CAntiCheat::OnClientMessage(int ClientID, int MsgID, bool System)
 {
-	if(ClientID < 0 || ClientID >= MAX_CLIENTS) return;
+	if(ClientID < 0 || ClientID >= MAX_CLIENTS) return false;
 	CClientData *pC = &m_aClients[ClientID];
-	if(!pC->m_FirstMessageTime) pC->m_FirstMessageTime = time_get();
+	const int64_t Now = time_get();
+	if(!pC->m_FirstMessageTime) pC->m_FirstMessageTime = Now;
 	if(System)
 	{
 		if(MsgID == NETMSG_INFO && ++pC->m_InfoMessages > 1) pC->m_SuspiciousScore += 10;
 		else if(MsgID == NETMSG_READY && ++pC->m_ReadyMessages > 1) pC->m_SuspiciousScore += 10;
 		else if(MsgID == NETMSG_ENTERGAME && ++pC->m_EnterGameMessages > 1) pC->m_SuspiciousScore += 10;
 	}
+
+	if(pC->m_SuspiciousScore >= 30)
+	{
+		pC->m_SuspiciousScore = 0;
+		if(m_pServer)
+			m_pServer->Kick(ClientID, "Protocol abuse: repeated handshake messages");
+		return true;
+	}
+
+	const int FloodLimit = g_Config.m_SvAnticheatMsgFlood;
+	if(FloodLimit > 0)
+	{
+		if(Now - pC->m_MsgWindowStart >= time_freq())
+		{
+			if(pC->m_MsgWindowCount > FloodLimit)
+				pC->m_FloodStrikes++;
+			else if(pC->m_FloodStrikes > 0)
+				pC->m_FloodStrikes--;
+			pC->m_MsgWindowStart = Now;
+			pC->m_MsgWindowCount = 0;
+			if(pC->m_FloodStrikes >= 2)
+			{
+				pC->m_FloodStrikes = 0;
+				if(m_pServer)
+					m_pServer->Kick(ClientID, "Too many messages");
+				return true;
+			}
+		}
+		pC->m_MsgWindowCount++;
+
+		if(pC->m_MsgWindowCount > FloodLimit * 2)
+		{
+			pC->m_FloodStrikes = 0;
+			if(m_pServer)
+				m_pServer->Kick(ClientID, "Too many messages");
+			return true;
+		}
+
+		if(pC->m_MsgWindowCount > FloodLimit)
+			return true;
+	}
+
+	return false;
 }
 
 void CAntiCheat::OnClientDisconnect(int ClientID)

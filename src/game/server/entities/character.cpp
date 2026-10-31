@@ -1276,6 +1276,10 @@ void CCharacter::Die(int Killer, int Weapon, bool SendKillMsg)
 	}
 	m_Rainbow = false;
 	m_Bloody = false;
+	m_KillStreak = 0;
+	m_MultiKillCount = 0;
+	m_LastKillTick = 0;
+	m_IsDoubleXp = false;
 	m_DrawEditor.OnPlayerDeath();
 
 	if(GameServer()->Arenas())

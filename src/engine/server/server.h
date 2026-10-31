@@ -179,6 +179,9 @@ public:
 		// per-tick preinput budget
 		int m_PreInputsTick;
 		int m_NumPreInputs;
+		// per-tick input rate limit
+		int m_InputTick;
+		int m_NumInputsInTick;
 		int m_Flags;
 		bool m_ShowIps;
 		bool m_DebugDummy;

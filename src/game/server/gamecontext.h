@@ -452,11 +452,10 @@ public:
 		return Mask;
 	}
 	static CClientMask CmaskNone() { return CClientMask(); }
-	void ResetKillAnnouncer(int ClientId = -1) { (void)ClientId; /* TODO */ }
-	void PlayMapSoundClients(int MapSoundId, const int *pClientIds, int NumClients, int FallbackSoundId = -1)
-	{
-		(void)MapSoundId; (void)pClientIds; (void)NumClients; (void)FallbackSoundId; /* TODO */
-	}
+	void ResetKillAnnouncer(int ClientId = -1);
+	void PlayMapSoundClients(int MapSoundId, const int *pClientIds, int NumClients, int FallbackSoundId = -1);
+	void PlayKillAnnouncer(int KillerID, int VictimID, int Weapon, bool AllowKillConfirm = false);
+	bool m_FirstBloodAnnounced = false;
 
 	enum
 	{

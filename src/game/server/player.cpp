@@ -1508,4 +1508,63 @@ bool CPlayer::RequestMinigameChange(int RequestedMinigame)
 	}
 	return true;
 }
+void CPlayer::GiveXP(int64_t Amount, const char *pReason)
+{
+	if(Amount <= 0)
+		return;
+
+	const int AccId = GetAccID();
+	SAccountInfo *pAcc = GameServer()->Accounts()->Get(AccId);
+	if(!pAcc || AccId < ACC_START || !pAcc->m_LoggedIn)
+		return;
+
+	bool IsDoubleXp = m_pCharacter && m_pCharacter->m_IsDoubleXp;
+	if(IsDoubleXp)
+		Amount *= 2;
+
+	pAcc->m_XP += Amount;
+
+	char aBuf[256];
+	if(pReason && pReason[0])
+	{
+		str_format(aBuf, sizeof(aBuf), "+%lld XP %s %s", (long long)Amount, pReason, IsDoubleXp ? "(doubled xp)" : "");
+		GameServer()->SendChatTarget(m_ClientId, aBuf);
+	}
+
+	while(pAcc->m_XP >= GameServer()->Accounts()->GetNeededXP(pAcc->m_Level))
+	{
+		pAcc->m_Level++;
+
+		int LevelReward = 500 + (pAcc->m_Level * 200);
+		WalletTransaction(LevelReward);
+
+		str_format(aBuf, sizeof(aBuf), "You are now level %d! Reward: +%d money", pAcc->m_Level, LevelReward);
+		GameServer()->SendChatTarget(m_ClientId, aBuf);
+
+		if(m_pCharacter)
+			GameServer()->CreateFinishConfetti(m_pCharacter->GetPos(), m_pCharacter->TeamMask());
+	}
+
+	GameServer()->Accounts()->Persist(AccId);
+}
+
+void CPlayer::GiveBlockPoints(int Amount, int Victim)
+{
+	const int AccId = GetAccID();
+	SAccountInfo *pAcc = GameServer()->Accounts()->Get(AccId);
+	if(!pAcc || AccId < ACC_START || !pAcc->m_LoggedIn)
+		return;
+
+	if(m_pCharacter && GameServer()->HasFlag(m_pCharacter) != -1)
+		Amount += 1;
+
+	pAcc->m_BlockPoints += Amount;
+
+	CCharacter *pVictim = GameServer()->GetPlayerChar(Victim);
+	if(pVictim)
+	{
+		GameServer()->CreateFlyingPoint(pVictim->GetPos(), m_ClientId, Victim, pVictim->Core()->m_Vel);
+	}
+	GameServer()->Accounts()->Persist(AccId);
+}
 #endif

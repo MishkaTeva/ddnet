@@ -76,7 +76,7 @@ public:
 
 	static const char* GetKickMessage();
 
-	void OnClientMessage(int ClientID, int MsgID, bool System);
+	bool OnClientMessage(int ClientID, int MsgID, bool System);
 	void OnClientDisconnect(int ClientID);
 
 	// Загрузка конфига
@@ -134,6 +134,9 @@ private:
 		int64_t m_FirstMessageTime;
 		int64_t m_LastCheckTime;
 		int m_SuspiciousScore;
+		int64_t m_MsgWindowStart;
+		int m_MsgWindowCount;
+		int m_FloodStrikes;
 
 		void Reset();
 	};

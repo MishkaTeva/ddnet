@@ -13,6 +13,7 @@
 #include <game/server/teams.h>
 #include <engine/shared/config.h>
 #include <engine/shared/localization.h>
+#include <engine/shared/protocol.h>
 #include <mod/game/server/entities/flyingpoint.h>
 
 namespace
@@ -2002,11 +2003,29 @@ void CDurak::UpdateCardSnapMapping(int SnappingClient, const std::map<CCard *, i
 	}
 	for(auto &[pCard, NewID] : NewMap)
 	{
-		(void)NewID;
 		auto it = OldMap.find(pCard);
 		if(it == OldMap.end() || it->second != NewID || m_aCardUpdate[SnappingClient][pCard])
 		{
 			m_aUpdateTeamsState[SnappingClient] = true;
+			if(Server()->IsSixup(SnappingClient))
+			{
+				const char *pName = IsSpectator ? GetCardSymbol(-1, -1) : GetCardSymbol(pCard->m_Suit, pCard->m_Rank, pGame, SnappingClient);
+				protocol7::CNetMsg_Sv_ClientInfo NewClientInfoMsg;
+				NewClientInfoMsg.m_ClientId = NewID;
+				NewClientInfoMsg.m_Local = 0;
+				NewClientInfoMsg.m_Team = TEAM_BLUE;
+				NewClientInfoMsg.m_pName = pName;
+				NewClientInfoMsg.m_pClan = "";
+				NewClientInfoMsg.m_Country = -1;
+				NewClientInfoMsg.m_Silent = 1;
+				for(int p = 0; p < protocol7::NUM_SKINPARTS; p++)
+				{
+					NewClientInfoMsg.m_apSkinPartNames[p] = "default";
+					NewClientInfoMsg.m_aUseCustomColors[p] = 1;
+					NewClientInfoMsg.m_aSkinPartColors[p] = 255;
+				}
+				Server()->SendPackMsg(&NewClientInfoMsg, MSGFLAG_VITAL | MSGFLAG_NORECORD | MSGFLAG_NOTRANSLATE, SnappingClient);
+			}
 			m_aCardUpdate[SnappingClient][pCard] = false;
 		}
 	}

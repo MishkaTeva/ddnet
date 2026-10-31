@@ -306,6 +306,10 @@ public:
 	bool m_Rainbow = false;
 	bool m_Bloody = false;
 	int m_Meteors = 0;
+	int m_KillStreak = 0;
+	int64_t m_LastKillTick = 0;
+	int m_MultiKillCount = 0;
+	bool m_IsDoubleXp = false;
 	bool m_IsPortalBlocker = false;
 	class CPortalBlocker *m_pPortalBlocker = nullptr;
 	class CLightsaber *m_pLightsaber = nullptr;
