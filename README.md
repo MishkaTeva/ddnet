@@ -13,7 +13,6 @@ This project combines DDNet's official master server integration, updated physic
 ## Mod Features
 
 ### 🛡️ Anti-Cheat & Network Hardening
-- **Input Flood Rate Limiter (`sv_max_inputs_per_tick`):** Enforces a strict limit on input packets per 20ms tick (default 10). Malicious client flood attacks, spinbot exploits, and input spam are dropped before invoking expensive server state updates.
 - **DDNet Token & Binary Checksum Verification:** Authentic client validation using token handshakes and MD5/SHA checksums against `anticheat_hashes.cfg`. Blocks cracked clients, multi-press bots, and modified binaries while whitelisting official DDNet builds.
 - **Packet Burst Suppression:** Deep network pre-filtering to prevent packet queue exhaustion and CPU thread starvation.
 - **Secure Messaging:** Rate-limited private messaging (`/w`, `/whisper`, `/c`) preventing spam bypasses.
@@ -77,8 +76,6 @@ Place your `autoexec.cfg` and `anticheat_hashes.cfg` in the server root or binar
 
 ```cfg
 # Network & Anti-Cheat
-sv_max_inputs_per_tick 10       # Max inputs accepted per 20ms tick from a single client
-sv_anticheat_msg_flood 400      # Message flood rate limit threshold
 sv_require_ddnet_checksum 0     # Set to 1 to enforce anticheat_hashes.cfg whitelist
 sv_anticheat_mode 1             # Enable heuristic cheat analysis
 

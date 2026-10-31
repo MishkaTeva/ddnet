@@ -494,39 +494,6 @@ bool CAntiCheat::OnClientMessage(int ClientID, int MsgID, bool System)
 		return true;
 	}
 
-	const int FloodLimit = g_Config.m_SvAnticheatMsgFlood;
-	if(FloodLimit > 0)
-	{
-		if(Now - pC->m_MsgWindowStart >= time_freq())
-		{
-			if(pC->m_MsgWindowCount > FloodLimit)
-				pC->m_FloodStrikes++;
-			else if(pC->m_FloodStrikes > 0)
-				pC->m_FloodStrikes--;
-			pC->m_MsgWindowStart = Now;
-			pC->m_MsgWindowCount = 0;
-			if(pC->m_FloodStrikes >= 2)
-			{
-				pC->m_FloodStrikes = 0;
-				if(m_pServer)
-					m_pServer->Kick(ClientID, "Too many messages");
-				return true;
-			}
-		}
-		pC->m_MsgWindowCount++;
-
-		if(pC->m_MsgWindowCount > FloodLimit * 2)
-		{
-			pC->m_FloodStrikes = 0;
-			if(m_pServer)
-				m_pServer->Kick(ClientID, "Too many messages");
-			return true;
-		}
-
-		if(pC->m_MsgWindowCount > FloodLimit)
-			return true;
-	}
-
 	return false;
 }
 

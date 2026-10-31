@@ -241,8 +241,6 @@ void CServer::CClient::Reset()
 	m_NumMapChunks = 0;
 	m_PreInputsTick = -1;
 	m_NumPreInputs = 0;
-	m_InputTick = -1;
-	m_NumInputsInTick = 0;
 	m_Flags = 0;
 	m_RedirectDropTime = 0;
 	m_IngameBeforeRejoin = false;
@@ -1951,20 +1949,6 @@ void CServer::ProcessClientPacket(CNetChunk *pPacket)
 				Size / (int)sizeof(int32_t) < MIN_INPUT_SIZE ||
 				Size / (int)sizeof(int32_t) > MAX_INPUT_SIZE)
 			{
-				return;
-			}
-
-			CClient &Client = m_aClients[ClientId];
-			if(Client.m_InputTick != Tick())
-			{
-				Client.m_InputTick = Tick();
-				Client.m_NumInputsInTick = 0;
-			}
-			Client.m_NumInputsInTick++;
-			if(Config()->m_SvMaxInputsPerTick != 0 && Client.m_NumInputsInTick > Config()->m_SvMaxInputsPerTick)
-			{
-				if(m_aClients[ClientId].m_State == CClient::STATE_INGAME && m_pAntibot)
-					m_pAntibot->OnDirectInput(ClientId);
 				return;
 			}
 
