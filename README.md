@@ -1,242 +1,124 @@
-[![DDraceNetwork](https://ddnet.org/ddnet-small.png)](https://ddnet.org)
+# M-DDrace on DDNet 20.3+
 
 [![Build status](https://github.com/ddnet/ddnet/actions/workflows/build.yml/badge.svg?branch=master)](https://github.com/ddnet/ddnet/actions/workflows/build.yml?branch=master)
 [![Code coverage](https://codecov.io/gh/ddnet/ddnet/branch/master/graph/badge.svg)](https://codecov.io/gh/ddnet/ddnet/branch/master)
 [![Translation status](https://hosted.weblate.org/widget/ddnet/ddnet/svg-badge.svg)](https://hosted.weblate.org/engage/ddnet/)
 
-Our own flavor of DDRace, a Teeworlds mod. See the [website](https://ddnet.org) for more information.
+**M-DDrace (Modern Edition)** is a next-generation port and complete overhaul of the popular open-world [F-DDrace](https://github.com/fokkonaut/F-DDrace) modification, re-architected on top of the latest **DDNet 20.3+** engine with modern **C++20**.
 
-Development discussions happen on #ddnet on Quakenet ([Webchat](http://webchat.quakenet.org/?channels=ddnet&uio=d4)) or on [Discord in the developer channel](https://discord.gg/xsEd9xu).
+This project combines DDNet's official master server integration, updated physics, high performance, and tickrate reliability with the rich open-world gameplay, player housing, minigames, and comprehensive anti-cheat/anti-bot protection of M-DDrace.
 
-You can get binary releases on the [DDNet website](https://ddnet.org/downloads/), find it on [Steam](https://store.steampowered.com/app/412220/DDraceNetwork/) or [install from repository](#installation-from-repository).
+---
 
-- [Code Browser](https://ddnet.org/codebrowser/DDNet/)
-- [Source Code Documentation](https://codedoc.ddnet.org/)
-- [Building Guide](docs/BUILDING.md)
-- [Debugging Guide](docs/DEBUGGING.md)
-- [Contributing Guide](docs/CONTRIBUTING.md)
+## Mod Features
 
-If you want to learn about the source code, you can check the [Development](https://wiki.ddnet.org/wiki/Development) article on the wiki.
+### 🛡️ Anti-Cheat & Network Hardening
+- **Input Flood Rate Limiter (`sv_max_inputs_per_tick`):** Enforces a strict limit on input packets per 20ms tick (default 10). Malicious client flood attacks, spinbot exploits, and input spam are dropped before invoking expensive server state updates.
+- **DDNet Token & Binary Checksum Verification:** Authentic client validation using token handshakes and MD5/SHA checksums against `anticheat_hashes.cfg`. Blocks cracked clients, multi-press bots, and modified binaries while whitelisting official DDNet builds.
+- **Packet Burst Suppression:** Deep network pre-filtering to prevent packet queue exhaustion and CPU thread starvation.
+- **Secure Messaging:** Rate-limited private messaging (`/w`, `/whisper`, `/c`) preventing spam bypasses.
+- **Discord Bot / Webhook Telemetry:** Automated reporting for antibot triggers, moderator actions, and minigame events directly to Discord channels.
 
-## Cloning
+### 🎮 Gameplay, Economy & Progression
+- **Modular Architecture (`CONF_FDDRACE_MOD`):** Cleanly separated mod logic located in `src/mod/` and linked via `cmake/fddrace_mod.cmake`. Toggleable at compile-time with `-DFDDRACE_MOD=ON/OFF`.
+- **Account & Leveling System:** Complete player profile persistence (XP, money, kills, deaths, playtime). Progressive 100-level scaling curve, double XP bonuses, and level-up rewards.
+- **Dynamic Plots & Real-Time Ingame Editor:** Rent personal plots and construct custom creations inside the live server:
+  - Laser walls (custom color, angle, thickness, collision).
+  - Laser doors with paired activation buttons.
+  - Directional speedups and jump pads.
+  - Multi-mode teleporters (standard, weapon, evil red/blue).
+  - Advanced selection, copy, move, and template tools.
+- **Minigames Suite:**
+  - **FNG (Freeze 'n Girl):** Fast-paced hammer and laser arena with solo and team scoring.
+  - **Survival:** Battle-royale survival gamemode.
+  - **1vs1 Arenas:** On-demand duel zones created anywhere on the map (`/1vs1 <player>`).
+  - **Durak Card Game:** Fully integrated Russian card game playable directly on the map.
+  - **Block Arenas:** Block battles with floating score indicators and bonus multipliers.
+- **Killstreak & Spree Announcer:** Audio cues and global broadcast announcements for killstreaks (Killing Spree, Rampage, Relentless, Unstoppable, GODLIKE).
 
-To clone this repository with external libraries and no history (~700 MiB):
+---
 
-```sh
-git clone --depth 1 --recursive --shallow-submodules https://github.com/ddnet/ddnet
+## Quickstart & Building
+
+### Prerequisites
+- CMake 3.17+
+- C++20 compliant compiler (MSVC 2022 v143+ on Windows, GCC 11+ or Clang 13+ on Linux)
+- Python 3.8+
+
+### Windows (MSVC 2022)
+
+The repository includes a ready-to-use build script:
+```bat
+_build_game_server.bat
 ```
 
-To clone this repository when you have the necessary libraries on your system already with no history (~150 MiB):
-
-```sh
-git clone --depth 1 https://github.com/ddnet/ddnet
+Or configure and build manually via CMake:
+```bat
+cmake -B build -G "Visual Studio 17 2022" -A x64 -DFDDRACE_MOD=ON -DPREFER_BUNDLED_LIBS=ON -DCLIENT=OFF
+cmake --build build --config Release --target M-DDrace-Server
 ```
 
-To clone this repository with external libraries and full history (~1 GiB):
+### Linux / macOS
 
-```sh
-git clone --recursive https://github.com/ddnet/ddnet
+```bash
+cmake -B build -DCMAKE_BUILD_TYPE=Release -DFDDRACE_MOD=ON -DCLIENT=OFF
+cmake --build build --target M-DDrace-Server -j$(nproc)
 ```
 
-To clone this repository when you have the necessary libraries on your system already with full history (~450 MiB):
+The resulting server binary will be named **`M-DDrace-Server`** (`M-DDrace-Server.exe` on Windows).
 
-```sh
-git clone https://github.com/ddnet/ddnet
+---
+
+## Server Configuration
+
+Place your `autoexec.cfg` and `anticheat_hashes.cfg` in the server root or binary directory.
+
+### Key Configuration Variables
+
+```cfg
+# Network & Anti-Cheat
+sv_max_inputs_per_tick 10       # Max inputs accepted per 20ms tick from a single client
+sv_anticheat_msg_flood 400      # Message flood rate limit threshold
+sv_require_ddnet_checksum 0     # Set to 1 to enforce anticheat_hashes.cfg whitelist
+sv_anticheat_mode 1             # Enable heuristic cheat analysis
+
+# Persistence & Performance
+sv_periodic_save 1              # Enable automated periodic save
+sv_data_save_interval 5         # Save interval in minutes
+sv_shutdown_save_tees 1         # Save players and plots on server shutdown
+
+# Discord Webhooks
+sv_discord_bridge_port "7778"
+sv_webhook_antibot_url "https://discord.com/api/webhooks/..."
+sv_webhook_minigames_url "https://discord.com/api/webhooks/..."
+sv_webhook_chat_url "https://discord.com/api/webhooks/..."
 ```
 
-To clone this repository since we moved the libraries to https://github.com/ddnet/ddnet-libs with history (~250 MiB):
+---
 
-```sh
-git clone --shallow-exclude=included-libs https://github.com/ddnet/ddnet
-```
+## Upstream DDNet Reference
 
-To clone the libraries if you have previously cloned DDNet without them, or if you require the ddnet-libs history instead of a shallow clone:
+This repository is built upon [DDraceNetwork (DDNet)](https://ddnet.org), an open-source Teeworlds modification.
 
-```sh
-git submodule update --init --recursive
-```
+- Official DDNet Website: <https://ddnet.org>
+- Source Code Documentation: <https://codedoc.ddnet.org/>
+- Upstream Building Guide: [docs/BUILDING.md](docs/BUILDING.md)
+- Development Wiki: <https://wiki.ddnet.org/wiki/Development>
 
-## Dependencies on Linux / macOS
+To build upstream vanilla DDNet without M-DDrace mod features, simply pass `-DFDDRACE_MOD=OFF` to CMake.
 
-You can install the required libraries on your system, `touch CMakeLists.txt` and CMake will use the system-wide libraries by default. You can install all required dependencies and CMake on Debian or Ubuntu like this:
+---
 
-```sh
-sudo apt install build-essential cargo cmake git glslang-tools google-mock libavcodec-extra libavdevice-dev libavfilter-dev libavformat-dev libavutil-dev libcurl4-openssl-dev libfreetype6-dev libglew-dev libnotify-dev libogg-dev libopus-dev libopusfile-dev libpng-dev libsdl2-dev libsqlite3-dev libssl-dev libvulkan-dev libwavpack-dev libx264-dev ninja-build python3 rustc spirv-tools
-```
-If your distribution doesn't ship with a `rustc` that is new enough, you can use `rustup` which automatically provides `rustc` 1.85.0 and above (this command removes `rustc` and reinstalls it as part of `rustup`.):
-```sh
-sudo apt install rustup
-```
+## Credits & Attribution
 
-In case the `rustc` dependency doesn't have the required version for any reason:
-```sh
-sudo apt install rustup-1.85
-```
+- **M-DDrace Mod Developer & Modern DDNet Port:** [MishkaTeva](https://github.com/MishkaTeva)
+- **F-DDrace Creator & Original Author:** [fokkonaut](https://github.com/fokkonaut)
+- **DDraceNetwork Core Team:** [Dennis Felsing (heinrich5991)](https://github.com/heinrich5991) and the DDNet team
+- **DDRace Creator:** Shereef Marzouk
+- **Teeworlds Creator:** [Magnus Auvinen (matricks)](https://github.com/matricks) and the Teeworlds community
 
-On older distributions like Ubuntu 18.04 don't install `google-mock`, but instead set `-DDOWNLOAD_GTEST=ON` when building to get a more recent gtest/gmock version.
+## License
 
-On older distributions `rustc` version might be too old, to get an up-to-date Rust compiler you can use [rustup](https://rustup.rs/) with stable channel instead or try the `rustc-mozilla` package.
-
-Or on CentOS, RedHat and AlmaLinux like this:
-
-```sh
-sudo yum install cargo cmake ffmpeg-devel freetype-devel gcc gcc-c++ git glew-devel glslang gmock-devel gtest-devel libcurl-devel libnotify-devel libogg-devel libpng-devel libx264-devel ninja-build openssl-devel opus-devel opusfile-devel python3 rust SDL2-devel spirv-tools sqlite-devel vulkan-devel wavpack-devel
-```
-
-Or on Fedora like this:
-
-```sh
-sudo dnf install cargo cmake ffmpeg-devel freetype-devel gcc gcc-c++ git glew-devel glslang gmock-devel gtest-devel libcurl-devel libnotify-devel libogg-devel libpng-devel make ninja-build openssl-devel opus-devel opusfile-devel python SDL2-devel spirv-tools sqlite-devel vulkan-devel wavpack-devel x264-devel
-```
-
-Or on Arch Linux like this:
-
-```sh
-sudo pacman -S --needed base-devel cmake curl ffmpeg freetype2 git glew glslang gmock libnotify libpng ninja opusfile python rust sdl2 spirv-tools sqlite vulkan-headers vulkan-icd-loader wavpack x264
-```
-
-Or on Gentoo like this:
-
-```sh
-emerge --ask dev-build/ninja dev-db/sqlite dev-lang/rust-bin dev-libs/glib dev-libs/openssl dev-util/glslang dev-util/spirv-headers dev-util/spirv-tools media-libs/freetype media-libs/glew media-libs/libglvnd media-libs/libogg media-libs/libpng media-libs/libsdl2 media-libs/libsdl2[vulkan] media-libs/opus media-libs/opusfile media-libs/pnglite media-libs/vulkan-loader[layers] media-sound/wavpack media-video/ffmpeg net-misc/curl x11-libs/gdk-pixbuf x11-libs/libnotify
-```
-
-Or on Void Linux like this:
-
-```sh
-sudo xbps-install -S base-devel cargo cmake ffmpeg6-devel freetype-devel git glew-devel glslang gtest-devel libcurl-devel libnotify-devel libogg-devel libpng-devel ninja openssl-devel opus-devel opusfile-devel sqlite-devel SPIRV-Tools-devel vulkan-loader wavpack-devel x264-devel SDL2-devel
-```
-
-On macOS you can use [homebrew](https://brew.sh/) to install build dependencies like this:
-
-```sh
-brew install cmake ffmpeg freetype glew glslang googletest libpng molten-vk ninja opusfile rust SDL2 spirv-tools vulkan-headers wavpack x264
-```
-
-If you don't want to use the system libraries, you can pass the `-DPREFER_BUNDLED_LIBS=ON` parameter to cmake.
-
-DDNet requires additional libraries, some of which are bundled for the most common platforms (Windows, Mac, Linux, all x86 and x86\_64) for convenience and the official builds. The bundled libraries for official builds are now in the ddnet-libs submodule. Note that when you build and develop locally, you should ideally use your system's package manager to install the dependencies, instead of relying on ddnet-libs submodule, which does not contain all dependencies anyway (e.g. openssl, vulkan). See the previous section for how to get the dependencies. Alternatively see our [Building Guide](docs/BUILDING.md) for how to disable some features and their dependencies (for example, `-DVULKAN=OFF` won't require Vulkan).
-
-## Building on Linux and macOS
-
-To compile DDNet yourself, execute the following commands in the source root:
-
-```sh
-cmake -Bbuild -GNinja
-cmake --build build
-```
-
-## Building on Windows with the Visual Studio IDE
-
-Download and install some version of [Microsoft Visual Studio](https://www.visualstudio.com/) (At the time of writing, MSVS Community 2022) with **C++ support**.
-
-You'll have to install both [Python 3](https://www.python.org/downloads/) and [Rust](https://rustup.rs/) as well.
-
-Make sure the MSVC build tools, C++ CMake-Tools and the latest Windows SDK version appropriate to your windows version are selected in the installer.
-
-Now open up your Project folder, Visual Studio should automatically detect and configure your project using CMake.
-
-On your tools hotbar next to the triangular "Run" Button, you can now select what you want to start (e.g game-client or game-server) and build it.
-
-## Building on Windows with standalone MSVC build tools
-
-First off you will need to install the following dependencies:
-
-- [MSVC Build Tools](https://visualstudio.microsoft.com/visual-cpp-build-tools/),
-- [Python 3](https://www.python.org/downloads/windows/),
-- [Rust](https://www.rust-lang.org/tools/install).
-
-To compile with the Vulkan graphics backend (disabled by default), you also need to install the [Vulkan SDK](https://vulkan.lunarg.com/sdk/home).
-
-To compile and build DDNet on Windows, use your IDE of choice either with a CMake integration (e.g Visual Studio Code), or by ~~**deprecated**~~ using the CMake GUI.
-
-Configure CMake to use the MSVC Build Tools appropriate to your System by your IDE's instructions.
-
-If you're using Visual Studio Code, you can use the [CMake Tools](https://marketplace.visualstudio.com/items?itemName=ms-vscode.cmake-tools) extension to configure and build the project.
-
-You can then open the project folder in Visual Studio Code and press `Ctrl+Shift+P` to open the command palette, then search for `CMake: Configure`.
-
-This will open up a prompt for you to select a kit, select your `Visual Studio` version and save it. You can now use the GUI (bottom left) to compile and build your project.
-
-
-<a href="https://repology.org/metapackage/ddnet/versions">
-	<img src="https://repology.org/badge/vertical-allrepos/ddnet.svg?header=" alt="Packaging status" align="right">
-</a>
-
-## Installation from Repository
-
-Debian/Ubuntu
-
-```sh
-sudo apt-get install ddnet
-```
-
-MacOS
-
-```sh
-brew install --cask ddnet
-```
-
-Fedora
-
-```sh
-sudo dnf install ddnet
-```
-
-Arch Linux
-
-```sh
-yay -S ddnet
-```
-
-FreeBSD
-
-```sh
-sudo pkg install DDNet
-```
-
-Windows (Scoop)
-```cmd
-scoop bucket add games
-scoop install games/ddnet
-```
-
-## Benchmarking
-
-Detailed instructions can be found in [`docs/BENCHMARKING.md`](docs/BENCHMARKING.md).
-
-## Working with the official DDNet Database
-
-Detailed instructions can be found in [`docs/DATABASE.md`](docs/DATABASE.md).
-
-## Debugging
-
-Detailed instructions can be found in [`docs/DEBUGGING.md`](docs/DEBUGGING.md).
-
-## Better Git Blame
-
-First, use a better tool than `git blame` itself, e.g. [`tig`](https://jonas.github.io/tig/). There's probably a good UI for Windows, too. Alternatively, use the GitHub UI, click "Blame" in any file view.
-
-For `tig`, use `tig blame path/to/file.cpp` to open the blame view, you can navigate with arrow keys or kj, press comma to go to the previous revision of the current line, q to quit.
-
-Only then you could also set up git to ignore specific formatting revisions:
-
-```sh
-git config blame.ignoreRevsFile formatting-revs.txt
-```
-
-## (Neo)Vim Syntax Highlighting for config files
-
-Copy the file detection and syntax files to your vim config folder:
-
-```sh
-# vim
-cp -R other/vim/* ~/.vim/
-
-# neovim
-cp -R other/vim/* ~/.config/nvim/
-```
-
-## Precompiled Headers
-
-By default precompiled headers are used for common system includes, see `src/pch.h`. In CI the Ubuntu 22.04 build disables precompiled headers to ensure we don't break compilation by forgetting includes. You might want to disable precompiled headers locally instead, at the cost of slower compile times, by setting `-DPRECOMPILE_HEADERS=OFF` in `cmake`.
+- Source code is licensed under the **zlib/libpng** license.
+- Assets under `data/` are licensed under **CC-BY-SA 3.0** (unless otherwise specified).
+- See [`license.txt`](license.txt) for detailed licensing terms.
